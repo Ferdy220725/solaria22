@@ -9,9 +9,15 @@ export default function AdminPage() {
   const [izins, setIzins] = useState<any[]>([]);
   const [tugas, setTugas] = useState<any[]>([]);
   const [file, setFile] = useState<File | null>(null);
+  
+  // State untuk Fitur Baru
   const [judulTugas, setJudulTugas] = useState('');
+  const [mkTugas, setMkTugas] = useState(''); // Tambahan Matkul Tugas
+  const [linkTugas, setLinkTugas] = useState(''); // Tambahan Link Tugas
   const [deadline, setDeadline] = useState('');
+  
   const [judulMateri, setJudulMateri] = useState('');
+  const [mkMateri, setMkMateri] = useState(''); // Tambahan Matkul Materi untuk Filter
 
   const supabase = createClient();
 
@@ -19,7 +25,8 @@ export default function AdminPage() {
 
   const fetchData = async () => {
     const { data: dIzin } = await supabase.from('perizinan').select('*').order('created_at', { ascending: false });
-    const { data: dTugas } = await supabase.from('tugas').select('*').order('deadline', { ascending: true });
+    // Mengambil dari tabel baru: tugas_praktikum
+    const { data: dTugas } = await supabase.from('tugas_praktikum').select('*').order('deadline', { ascending: true });
     if (dIzin) setIzins(dIzin);
     if (dTugas) setTugas(dTugas);
   };
@@ -30,15 +37,13 @@ export default function AdminPage() {
     else alert("Password Salah!");
   };
 
-  // FITUR HAPUS TUGAS
   const deleteTugas = async (id: string) => {
     if (confirm("Hapus tugas ini dari dashboard?")) {
-      await supabase.from('tugas').delete().eq('id', id);
+      await supabase.from('tugas_praktikum').delete().eq('id', id);
       fetchData();
     }
   };
 
-  // FITUR HAPUS PERIZINAN (Agar tidak menumpuk)
   const deleteIzin = async (id: string) => {
     if (confirm("Hapus data perizinan mahasiswa ini?")) {
       await supabase.from('perizinan').delete().eq('id', id);
@@ -46,22 +51,49 @@ export default function AdminPage() {
     }
   };
 
-  // FITUR UPLOAD MATERI
   const handleUploadMateri = async () => {
-    if (!file || !judulMateri) return alert("Pilih file & isi judul!");
+    if (!file || !judulMateri || !mkMateri) return alert("Isi Judul, Mata Kuliah, dan Pilih File!");
+    
     const fileName = `${Date.now()}_${file.name}`;
     const { error: upError } = await supabase.storage.from('uploads').upload(fileName, file);
     
-    if (upError) return alert("Gagal Upload: Pastikan bucket 'uploads' sudah Public");
+    if (upError) return alert("Gagal Upload Storage!");
 
     const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(fileName);
-    await supabase.from('materi').insert([{ judul: judulMateri, file_url: urlData.publicUrl }]);
+    
+    // Sekarang memasukkan mk_nama agar bisa difilter mahasiswa
+    await supabase.from('materi').insert([{ 
+      judul: judulMateri, 
+      file_url: urlData.publicUrl,
+      mk_nama: mkMateri 
+    }]);
+
     alert("Materi Berhasil di-Upload!");
     setJudulMateri('');
+    setMkMateri('');
     setFile(null);
   };
 
-  // FITUR DOWNLOAD PDF SURAT IZIN (Template Resmi)
+  const handlePostTugas = async () => {
+    if (!judulTugas || !mkTugas || !deadline) return alert("Mohon lengkapi info tugas!");
+    
+    const { error } = await supabase.from('tugas_praktikum').insert([{
+      judul_tugas: judulTugas,
+      mk_nama: mkTugas,
+      deadline: deadline,
+      link_pengumpulan: linkTugas // Opsional
+    }]);
+
+    if (error) alert("Gagal post tugas");
+    else {
+      alert("Tugas Praktikum Berhasil di-Post!");
+      setJudulTugas('');
+      setMkTugas('');
+      setLinkTugas('');
+      fetchData();
+    }
+  };
+
   const downloadPDF = (data: any) => {
     const doc = new jsPDF();
     const date = new Date(data.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -107,65 +139,91 @@ export default function AdminPage() {
   );
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-10">
-      <h1 className="text-3xl font-bold text-[#800020]">Panel Control Admin</h1>
+    <div className="p-8 max-w-6xl mx-auto space-y-10 bg-slate-50 min-h-screen">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-[#800020]">Panel Control Admin</h1>
+        <button onClick={() => window.location.reload()} className="text-sm bg-slate-200 px-4 py-2 rounded-lg">Logout</button>
+      </div>
 
-      {/* Grid Input */}
       <div className="grid md:grid-cols-2 gap-8">
+        {/* Form Tugas Praktikum */}
         <div className="bg-white p-6 rounded-xl shadow border-l-8 border-[#D4AF37]">
-          <h2 className="font-bold mb-4">Tambah Tugas ke Dashboard</h2>
-          <input type="text" placeholder="Judul Tugas" className="w-full border p-2 mb-2 rounded" onChange={e => setJudulTugas(e.target.value)} />
-          <input type="datetime-local" className="w-full border p-2 mb-4 rounded" onChange={e => setDeadline(e.target.value)} />
-          <button onClick={async () => { await supabase.from('tugas').insert([{ judul_tugas: judulTugas, deadline: deadline }]); fetchData(); }} className="w-full bg-[#D4AF37] text-white py-2 rounded">Post Tugas</button>
+          <h2 className="font-bold mb-4 text-slate-700">Tambah Info Tugas Praktikum</h2>
+          <input type="text" placeholder="Nama Mata Kuliah" className="w-full border p-2 mb-2 rounded" value={mkTugas} onChange={e => setMkTugas(e.target.value)} />
+          <input type="text" placeholder="Judul Tugas" className="w-full border p-2 mb-2 rounded" value={judulTugas} onChange={e => setJudulTugas(e.target.value)} />
+          <input type="text" placeholder="Link Pengumpulan (Opsional)" className="w-full border p-2 mb-2 rounded" value={linkTugas} onChange={e => setLinkTugas(e.target.value)} />
+          <label className="text-xs text-slate-500">Deadline Tugas:</label>
+          <input type="datetime-local" className="w-full border p-2 mb-4 rounded" value={deadline} onChange={e => setDeadline(e.target.value)} />
+          <button onClick={handlePostTugas} className="w-full bg-[#D4AF37] text-white py-2 rounded font-bold">Post ke Dashboard</button>
         </div>
 
+        {/* Form Upload Materi */}
         <div className="bg-white p-6 rounded-xl shadow border-l-8 border-[#800020]">
-          <h2 className="font-bold mb-4">Upload Materi Kuliah</h2>
-          <input type="text" placeholder="Judul Materi (Contoh: Genetika Minggu 1)" className="w-full border p-2 mb-2 rounded" value={judulMateri} onChange={e => setJudulMateri(e.target.value)} />
-          <input type="file" className="w-full border p-2 mb-4 rounded" onChange={e => setFile(e.target.files?.[0] || null)} />
-          <button onClick={handleUploadMateri} className="w-full bg-[#800020] text-white py-2 rounded">Simpan Materi</button>
+          <h2 className="font-bold mb-4 text-slate-700">Upload Materi Kuliah</h2>
+          <input type="text" placeholder="Nama Mata Kuliah (Untuk Filter)" className="w-full border p-2 mb-2 rounded" value={mkMateri} onChange={e => setMkMateri(e.target.value)} />
+          <input type="text" placeholder="Judul Materi (Contoh: Minggu 1)" className="w-full border p-2 mb-2 rounded" value={judulMateri} onChange={e => setJudulMateri(e.target.value)} />
+          <input type="file" className="w-full border p-2 mb-4 rounded text-sm" onChange={e => setFile(e.target.files?.[0] || null)} />
+          <button onClick={handleUploadMateri} className="w-full bg-[#800020] text-white py-2 rounded font-bold">Simpan Materi</button>
         </div>
       </div>
 
-      {/* List Tugas */}
+      {/* Manajemen Tugas Dashboard */}
       <div className="bg-white p-6 rounded-xl shadow">
-        <h2 className="text-xl font-bold mb-4 text-slate-800">Manajemen Tugas</h2>
-        <div className="space-y-2">
+        <h2 className="text-xl font-bold mb-4 text-slate-800">Tugas Praktikum Aktif</h2>
+        <div className="space-y-3">
+          {tugas.length === 0 && <p className="text-slate-400 text-center py-4">Belum ada tugas yang diposting.</p>}
           {tugas.map(t => (
-            <div key={t.id} className="flex justify-between items-center p-3 border-b hover:bg-slate-50">
-              <span>{t.judul_tugas} - <small className="text-red-500">{new Date(t.deadline).toLocaleString()}</small></span>
-              <button onClick={() => deleteTugas(t.id)} className="text-red-600 hover:bg-red-50 px-3 py-1 rounded-lg text-sm border border-red-200">Hapus</button>
+            <div key={t.id} className="flex justify-between items-center p-4 border rounded-lg hover:bg-slate-50">
+              <div>
+                <p className="font-bold text-[#800020]">{t.mk_nama}</p>
+                <p className="text-sm text-slate-600">{t.judul_tugas}</p>
+                <p className="text-xs text-red-500 font-medium">Deadline: {new Date(t.deadline).toLocaleString('id-ID')}</p>
+              </div>
+              <button onClick={() => deleteTugas(t.id)} className="text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm border border-red-200">Hapus</button>
             </div>
           ))}
         </div>
       </div>
 
-      {/* List Perizinan */}
+      {/* Manajemen Perizinan & Surat Dokter */}
       <h2 className="text-xl font-bold mb-4">Daftar Mahasiswa Izin</h2>
       <div className="bg-white rounded-xl shadow overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="p-4">Nama & NPM</th>
-              <th className="p-4">Mata Kuliah</th>
-              <th className="p-4 text-center">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {izins.map(i => (
-              <tr key={i.id} className="border-b hover:bg-slate-50">
-                <td className="p-4 font-medium">{i.nama_lengkap}<br/><small className="text-slate-400">{i.npm}</small></td>
-                <td className="p-4">{i.mk_nama}</td>
-                <td className="p-4">
-                  <div className="flex justify-center gap-2">
-                    <button onClick={() => downloadPDF(i)} className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">Unduh PDF</button>
-                    <button onClick={() => deleteIzin(i.id)} className="bg-red-100 text-red-600 px-3 py-1 rounded text-sm hover:bg-red-200">Hapus</button>
-                  </div>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-slate-100">
+              <tr>
+                <th className="p-4 border-b">Nama & NPM</th>
+                <th className="p-4 border-b">Mata Kuliah</th>
+                <th className="p-4 border-b">Surat Dokter</th>
+                <th className="p-4 border-b text-center">Aksi</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {izins.map(i => (
+                <tr key={i.id} className="border-b hover:bg-slate-50">
+                  <td className="p-4">
+                    <span className="font-bold text-slate-800">{i.nama_lengkap}</span>
+                    <br/><small className="text-slate-500">{i.npm}</small>
+                  </td>
+                  <td className="p-4 text-slate-700">{i.mk_nama}</td>
+                  <td className="p-4">
+                    {i.surat_dokter_url ? (
+                      <a href={i.surat_dokter_url} target="_blank" className="text-blue-600 underline text-sm font-medium">Lihat Surat</a>
+                    ) : (
+                      <span className="text-slate-400 text-sm italic">Tidak Ada</span>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    <div className="flex justify-center gap-2">
+                      <button onClick={() => downloadPDF(i)} className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-700">PDF</button>
+                      <button onClick={() => deleteIzin(i.id)} className="bg-red-100 text-red-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-200">Hapus</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

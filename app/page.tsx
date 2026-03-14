@@ -8,9 +8,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchTugas = async () => {
-      // Mengambil data dari tabel baru: tugas_praktikum
+      // Sekarang mengambil data dari tabel 'tugas_perkuliahan' 
+      // (Pastikan kamu buat tabel ini di Supabase atau sesuaikan namanya)
       const { data } = await supabase
-        .from('tugas_praktikum')
+        .from('tugas_perkuliahan') 
         .select('*')
         .order('deadline', { ascending: true });
       
@@ -23,7 +24,6 @@ export default function Dashboard() {
     const now = new Date();
     const deadline = new Date(deadlineStr);
     const selisihJam = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
-    // Peringatan jika waktu sisa antara 0 sampai 12 jam
     if (selisihJam > 0 && selisihJam <= 12) return true;
     return false;
   };
@@ -53,11 +53,11 @@ export default function Dashboard() {
           </ul>
         </div>
 
-        {/* KOLOM 2 & 3: TUGAS PRAKTIKUM MENDATANG */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-md border-t-4 border-[#D4AF37]">
+        {/* KOLOM 2 & 3: TUGAS PERKULIAHAN (REVISI) */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-md border-t-4 border-[#004d40]">
           <div className="flex items-center gap-2 mb-4 border-b pb-2">
-            <span className="text-xl">📝</span>
-            <h2 className="text-xl font-bold text-slate-800">Informasi Tugas Praktikum</h2>
+            <span className="text-xl">📚</span>
+            <h2 className="text-xl font-bold text-slate-800">Informasi Tugas Perkuliahan</h2>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -65,7 +65,7 @@ export default function Dashboard() {
               <div key={t.id} className="p-5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] font-bold bg-[#D4AF37] text-white px-2 py-0.5 rounded">TUGAS</span>
+                    <span className="text-[10px] font-bold bg-[#004d40] text-white px-2 py-0.5 rounded">KULIAH</span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase">{t.mk_nama}</span>
                   </div>
                   <p className="font-bold text-slate-800 text-lg mb-1">{t.judul_tugas}</p>
@@ -80,7 +80,7 @@ export default function Dashboard() {
                 <div className="space-y-2">
                   {checkDeadline(t.deadline) && (
                     <div className="p-2 bg-red-600 text-white text-[10px] font-bold rounded-lg animate-pulse text-center">
-                      🚨 KURANG DARI 12 JAM!
+                      🚨 SEGERA KUMPULKAN!
                     </div>
                   )}
                   
@@ -88,7 +88,7 @@ export default function Dashboard() {
                     <a 
                       href={t.link_pengumpulan} 
                       target="_blank" 
-                      className="block w-full bg-[#800020] text-white text-center py-2 rounded-lg text-xs font-bold hover:bg-[#5a0016] transition-all"
+                      className="block w-full bg-[#004d40] text-white text-center py-2 rounded-lg text-xs font-bold hover:bg-[#00332c] transition-all"
                     >
                       Kumpulkan Tugas →
                     </a>
@@ -99,7 +99,7 @@ export default function Dashboard() {
 
             {tugas.length === 0 && (
               <div className="col-span-full py-10 text-center">
-                <p className="text-slate-400 italic">Alhamdulillah, belum ada tugas praktikum aktif.</p>
+                <p className="text-slate-400 italic">Alhamdulillah, belum ada tugas perkuliahan aktif.</p>
               </div>
             )}
           </div>

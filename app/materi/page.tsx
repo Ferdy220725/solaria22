@@ -23,14 +23,12 @@ export default function MateriPage() {
 
     if (data) {
       setMateri(data);
-      // Mengambil daftar mata kuliah unik untuk isi Dropdown filter
       const matkuls = data.map((item: any) => item.mk_nama).filter((v, i, a) => v && a.indexOf(v) === i);
       setDaftarMatkul(matkuls);
     }
     setLoading(false);
   };
 
-  // Logika memfilter materi berdasarkan pilihan dropdown
   const filteredMateri = selectedMatkul === 'Semua' 
     ? materi 
     : materi.filter(m => m.mk_nama === selectedMatkul);
@@ -43,7 +41,7 @@ export default function MateriPage() {
           <p className="text-slate-500">Unduh materi sesuai mata kuliah yang kamu butuhkan.</p>
         </div>
 
-        {/* DROPDOWN FILTER */}
+        {/* DROPDOWN FILTER - Tetap Sama */}
         <div className="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border">
           <label className="text-sm font-bold text-slate-600 px-2">Filter:</label>
           <select 
@@ -71,7 +69,18 @@ export default function MateriPage() {
                   {item.mk_nama || 'Umum'}
                 </span>
               </div>
-              <p className="text-sm text-slate-500 mb-4">Diupload pada: {new Date(item.created_at).toLocaleDateString('id-ID')}</p>
+              
+              {/* BAGIAN YANG DIPERBAIKI: Menampilkan waktu dalam WIB */}
+              <p className="text-sm text-slate-500 mb-4">
+                Diupload pada: {new Date(item.created_at).toLocaleString('id-ID', { 
+                  day: '2-digit', 
+                  month: 'long', 
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  timeZone: 'Asia/Jakarta' 
+                })} WIB
+              </p>
               
               <div className="flex gap-3">
                 <a 

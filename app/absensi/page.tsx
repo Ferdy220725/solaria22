@@ -1,150 +1,223 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createClient } from '../../utils/supabase/client';
-import { useRouter } from 'next/navigation';
 
-export default function AbsensiKlik() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(false);
+// Daftar Mahasiswa yang kamu berikan
+const DAFTAR_MAHASISWA = [
+  { npm: "25025010093", nama: "SITI NUR FADILAH" },
+  { npm: "25025010094", nama: "AGNIA LAQUINTA A-ABIN" },
+  { npm: "25025010095", nama: "AFIA DWI AGUSTIN" },
+  { npm: "25025010096", nama: "APRILITA MASYFATAH" },
+  { npm: "25025010097", nama: "SYAKILA BALQIS AL-FANEZA" },
+  { npm: "25025010098", nama: "AULIA EKA SAITRI" },
+  { npm: "25025010099", nama: "CALLISTA ZAHRATUNISSA" },
+  { npm: "25025010100", nama: "AHMAT CHOYRUL FERDYANSYAH" },
+  { npm: "25025010101", nama: "DHEA FITRI RAMADHANI" },
+  { npm: "25025010102", nama: "ALIEF RAHMAT AKBARANI" },
+  { npm: "25025010103", nama: "KARISMA ZAHRA LAILATUL FUADAH" },
+  { npm: "25025010104", nama: "JAZZICA AZZURRA ANINDYA ZANDRA" },
+  { npm: "25025010105", nama: "ENDYATMA ADRIEL FABIAN DAVID" },
+  { npm: "25025010106", nama: "RIZQI SURYA PRATAMA" },
+  { npm: "25025010107", nama: "ANNISA AULIA RAMADANI" },
+  { npm: "25025010108", nama: "EKA RISZIANA AGUSTIN" },
+  { npm: "25025010109", nama: "KHULLATUL BARIROH" },
+  { npm: "25025010110", nama: "AGATHA ZULEYKA RAMDAN" },
+  { npm: "25025010111", nama: "FAQIHATUN NISA’" },
+  { npm: "25025010112", nama: "SALSABILLA OCTAVIA RAMADHANI" },
+  { npm: "25025010113", nama: "KEYSHA AULIA AZZAHRA" },
+  { npm: "25025010114", nama: "ANGEL MONICA NH" },
+  { npm: "25025010115", nama: "USWATUN KHASANAH" },
+  { npm: "25025010116", nama: "DHARMA AJI WISNU UTAMA" },
+  { npm: "25025010117", nama: "KEIKY RESVANTI RAMADHANTI" },
+  { npm: "25025010118", nama: "ANDINI SALWA INGRAINI" },
+  { npm: "25025010119", nama: "TALITHA LISTYA SALSABILA" },
+  { npm: "25025010120", nama: "ANDREA BENAYA PAGONGGANG" },
+  { npm: "25025010121", nama: "AQDRIA YASHIRLY AMIRILA" },
+  { npm: "25025010122", nama: "MOHAMMAD RIZKY HIKMAL PRAWIRA" },
+  { npm: "25025010123", nama: "SAFRINA BR TINJAK" },
+  { npm: "25025010124", nama: "CITRA PUTRI RAHMADANY" },
+  { npm: "25025010125", nama: "ARJUNA WIRA KUSUMA" },
+  { npm: "25025010126", nama: "NADIA FEBRISCA RACHMA" },
+  { npm: "25025010127", nama: "KHANZA AFIFAH AMALINA" },
+  { npm: "25025010128", nama: "FARINA PUTRI AURELIA" },
+  { npm: "25025010129", nama: "M. FAREL AL FAHREZI" },
+  { npm: "25025010130", nama: "LILIS DWI NURFADILAH" },
+  { npm: "25025010131", nama: "AGNIA ALYA PUTRI" },
+  { npm: "25025010132", nama: "CIKA RAHMA DWI ANJARSARI" },
+  { npm: "25025010133", nama: "MARCELLY ELZA VARODIES" },
+  { npm: "25025010134", nama: "MUHAMMAD DAFFA ABYANSYAH" },
+  { npm: "25025010135", nama: "RAFINES AL MUSLIM" },
+  { npm: "25025010137", nama: "SONYA DAMAYANTI AZ-ZAHARA" },
+  { npm: "25025010138", nama: "PRATIWI CITRA OKTAVIA" }
+];
+
+export default function AbsensiMahasiswa() {
+  const [selectedStudent, setSelectedStudent] = useState('');
+  const [namaManual, setNamaManual] = useState('');
+  const [npmManual, setNpmManual] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  
   const supabase = createClient();
-  const router = useRouter();
 
-  // Daftar Mahasiswa Agrotek C
-  const mahasiswaList = [
-    { npm: "25025010093", nama: "Siti Nur Fadilah" },
-    { npm: "25025010094", nama: "Agnia Laquinta A-Abin" },
-    { npm: "25025010095", nama: "Afia Dwi Agustin" },
-    { npm: "25025010096", nama: "Aprilita Masyfatah" },
-    { npm: "25025010097", nama: "Syakila Balqis Al-Faneza" },
-    { npm: "25025010098", nama: "Aulia Eka Saitri" },
-    { npm: "25025010099", nama: "Callista Zahratunissa" },
-    { npm: "25025010100", nama: "Ahmat Choyrul Ferdyansyah" },
-    { npm: "25025010101", nama: "Dhea Fitri Ramadhani" },
-    { npm: "25025010102", nama: "Alief Rahmat Akbarani" },
-    { npm: "25025010103", nama: "Karisma Zahra Lailatul Fuadah" },
-    { npm: "25025010104", nama: "Jazzica Azzurra Anindya Zandra" },
-    { npm: "25025010105", nama: "Endyatma Adriel Fabian David" },
-    { npm: "25025010106", nama: "Rizqi Surya Pratama" },
-    { npm: "25025010107", nama: "Annisa Aulia Ramadani" },
-    { npm: "25025010108", nama: "Eka Risziana Agustin" },
-    { npm: "25025010109", nama: "Khullatul Bariroh" },
-    { npm: "25025010110", nama: "Agatha Zuleyka Ramdan" },
-    { npm: "25025010111", nama: "Faqihatun Nisa’" },
-    { npm: "25025010112", nama: "Salsabilla Octavia Ramadhani" },
-    { npm: "25025010113", nama: "Keysha Aulia Azzahra" },
-    { npm: "25025010114", nama: "Angel Monica NH" },
-    { npm: "25025010115", nama: "Uswatun Khasanah" },
-    { npm: "25025010116", nama: "Dharma Aji Wisnu Utama" },
-    { npm: "25025010117", nama: "Keiky Resvanti Ramadhanti" },
-    { npm: "25025010118", nama: "Andini Salwa Ingraini" },
-    { npm: "25025010119", nama: "Talitha Listya Salsabila" },
-    { npm: "25025010120", nama: "Andrea Benaya Pagonggang" },
-    { npm: "25025010121", nama: "Aqdria Yashirly Amirila" },
-    { npm: "25025010122", nama: "Mohammad Rizky Hikmal Prawira" },
-    { npm: "25025010123", nama: "Safrina Br Tinjka" },
-    { npm: "25025010124", nama: "Citra Putri Rahmadany" },
-    { npm: "25025010125", nama: "Arjuna Wira Kusuma" },
-    { npm: "25025010126", nama: "Nadia Febrisca Rachma" },
-    { npm: "25025010127", nama: "Khanza Afifah Amalina" },
-    { npm: "25025010128", nama: "Farina Putri Aurelia" },
-    { npm: "25025010129", nama: "M Farel Al Fahrezi" },
-    { npm: "25025010130", nama: "Lilis Dwi Nurfadilah" },
-    { npm: "25025010131", nama: "Agnia Alya Putri" },
-    { npm: "25025010132", nama: "Cika Rahma Dwi Anjarsari" },
-    { npm: "25025010133", nama: "Marcelly Elza Varodies" },
-    { npm: "25025010134", nama: "Muhammad Daffa Abyansyah" },
-    { npm: "25025010135", nama: "Rafines Al Muslim" },
-    { npm: "25025010137", nama: "Sonya Damayanti Az-Zahara" },
-    { npm: "25025010138", nama: "Pratiwi Citra Oktavia" }
-  ];
+  useEffect(() => {
+    checkStatus();
+  }, []);
 
-  // Filter pencarian
-  const filteredMahasiswa = mahasiswaList.filter(m => 
-    m.nama.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    m.npm.includes(searchTerm)
-  );
+  const checkStatus = async () => {
+    const { data } = await supabase
+      .from('status_sistem')
+      .select('is_active')
+      .eq('id', 'absensi')
+      .maybeSingle();
+    
+    setIsOpen(data?.is_active || false);
+    setLoading(false);
+  };
 
-  const handleAbsen = async (mhs: { nama: string, npm: string }) => {
-    const yakin = confirm(`Konfirmasi Absensi atas nama:\n${mhs.nama}\n(${mhs.npm})`);
-    if (!yakin) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    let finalNama = "";
+    let finalNpm = "";
 
-    setLoading(true);
+    if (selectedStudent === "LAINNYA") {
+      if (!namaManual || !npmManual) return alert("Mohon isi Nama dan NPM!");
+      finalNama = namaManual.trim().toUpperCase();
+      finalNpm = npmManual.trim();
+    } else if (selectedStudent !== "") {
+      const student = DAFTAR_MAHASISWA.find(s => s.npm === selectedStudent);
+      finalNama = student?.nama || "";
+      finalNpm = student?.npm || "";
+    } else {
+      return alert("Silakan pilih nama Anda!");
+    }
+    
+    setIsSubmitting(true);
+
     try {
-      const { error } = await supabase.from('absensi').insert([
-        { 
-          nama_mahasiswa: mhs.nama, 
-          npm: mhs.npm,
-          waktu_absen: new Date().toISOString() 
-        }
-      ]);
+      const now = new Date();
+      const wibOffset = 7 * 60 * 60 * 1000;
+      const wibTime = new Date(now.getTime() + wibOffset);
+      const today = wibTime.toISOString().split('T')[0];
+
+      const { data: existing } = await supabase
+        .from('absensi')
+        .select('id')
+        .eq('npm', finalNpm)
+        .gte('waktu_absen', `${today}T00:00:00Z`)
+        .lte('waktu_absen', `${today}T23:59:59Z`)
+        .maybeSingle();
+
+      if (existing) {
+        alert("NPM ini sudah melakukan presensi hari ini!");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('absensi')
+        .insert([{
+          nama_mahasiswa: finalNama,
+          npm: finalNpm,
+          waktu_absen: new Date().toISOString()
+        }]);
 
       if (error) throw error;
 
-      alert("Berhasil! Kehadiran Anda telah dicatat.");
-      router.push('/');
+      // --- BAGIAN YANG DITAMBAHKAN AGAR DASHBOARD BISA MENGENALI NAMA ---
+      localStorage.setItem('nama_user_solaria', finalNama);
+      // ----------------------------------------------------------------
+
+      setIsSuccess(true);
+      
     } catch (err: any) {
-      alert("Gagal absen: " + err.message);
+      alert("Sistem Error: " + err.message);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
+  if (loading) return <div className="flex h-screen items-center justify-center font-bold text-slate-400">LOADING...</div>;
+
+  if (!isOpen) return (
+    <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
+      <div className="text-center bg-white p-10 rounded-[40px] shadow-xl border-t-[10px] border-red-600 max-w-md w-full">
+        <h1 className="text-3xl font-black text-red-600 mb-4 uppercase">ABSEN CLOSED</h1>
+        <p className="font-bold text-slate-500 uppercase text-xs">Sistem sedang ditutup oleh Admin.</p>
+      </div>
+    </div>
+  );
+
+  if (isSuccess) return (
+    <div className="flex h-screen items-center justify-center bg-green-50 p-6">
+      <div className="text-center bg-white p-10 rounded-[40px] shadow-2xl border-t-[10px] border-green-600 max-w-md w-full">
+        <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+           <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+        </div>
+        <h1 className="text-2xl font-black text-green-700 uppercase mb-2">Berhasil!</h1>
+        <p className="font-bold text-slate-600 uppercase text-[12px]">Presensi Anda sudah direkam</p>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-slate-50 p-6 font-sans">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <button onClick={() => router.push('/')} className="text-[#800020] font-black text-xs uppercase mb-4 tracking-widest">← Kembali ke Dashboard</button>
-          <h1 className="text-3xl font-black text-[#800020] uppercase tracking-tighter">Absensi Agrotek C</h1>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1">Klik Nama Anda Untuk Absen</p>
-        </div>
+    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden border-t-[10px] border-[#800020]">
+        <div className="p-10">
+          <div className="mb-8 text-center">
+            <h1 className="text-2xl font-black text-[#800020] uppercase">Absensi Mahasiswa</h1>
+            <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Pilih nama atau isi manual jika tidak ada</p>
+          </div>
 
-        {/* Kotak Pencarian */}
-        <div className="relative mb-6">
-          <input 
-            type="text" 
-            placeholder="Cari Nama atau NPM Anda..." 
-            className="w-full p-5 bg-white rounded-3xl shadow-sm border-2 border-transparent focus:border-[#800020] outline-none font-bold transition-all text-sm"
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <span className="absolute right-5 top-5 opacity-20">🔍</span>
-        </div>
-
-        {/* Daftar Mahasiswa */}
-        <div className="grid grid-cols-1 gap-3">
-          {filteredMahasiswa.map((mhs) => (
-            <button
-              key={mhs.npm}
-              disabled={loading}
-              onClick={() => handleAbsen(mhs)}
-              className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center group hover:border-[#800020] hover:bg-red-50 transition-all active:scale-[0.98] text-left"
-            >
-              <div>
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest group-hover:text-[#800020] transition-colors">{mhs.npm}</p>
-                <p className="font-black text-slate-800 text-sm uppercase group-hover:text-[#800020] transition-colors">{mhs.nama}</p>
-              </div>
-              <div className="bg-slate-50 p-2 rounded-xl group-hover:bg-[#800020] group-hover:text-white transition-all text-xs font-black">
-                HADIR
-              </div>
-            </button>
-          ))}
-
-          {filteredMahasiswa.length === 0 && (
-            <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
-              <p className="text-slate-400 font-bold uppercase text-xs">Mahasiswa Tidak Ditemukan</p>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2">Cari Nama</label>
+              <select 
+                value={selectedStudent}
+                onChange={(e) => setSelectedStudent(e.target.value)}
+                className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-[#800020] rounded-2xl outline-none font-bold appearance-none cursor-pointer transition-all"
+              >
+                <option value="">-- KLIK UNTUK MEMILIH NAMA --</option>
+                {DAFTAR_MAHASISWA.map((m) => (
+                  <option key={m.npm} value={m.npm}>{m.nama}</option>
+                ))}
+                <option value="LAINNYA">--- SAYA TIDAK ADA DI DAFTAR (LAINNYA) ---</option>
+              </select>
             </div>
-          )}
+
+            {selectedStudent === "LAINNYA" && (
+              <div className="space-y-4 animate-in fade-in duration-500">
+                <input 
+                  type="text" 
+                  placeholder="MASUKKAN NAMA LENGKAP"
+                  className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold uppercase"
+                  value={namaManual}
+                  onChange={(e) => setNamaManual(e.target.value)}
+                />
+                <input 
+                  type="number" 
+                  placeholder="MASUKKAN NPM"
+                  className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold"
+                  value={npmManual}
+                  onChange={(e) => setNpmManual(e.target.value)}
+                />
+              </div>
+            )}
+
+            <button 
+              disabled={isSubmitting}
+              type="submit" 
+              className={`w-full py-5 rounded-2xl font-black text-white uppercase shadow-lg transition-all ${isSubmitting ? 'bg-slate-400' : 'bg-[#800020] hover:bg-black active:scale-95'}`}
+            >
+              {isSubmitting ? 'MEMPROSES...' : 'KIRIM ABSENSI'}
+            </button>
+          </form>
         </div>
       </div>
-
-      {loading && (
-        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-[#800020] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="font-black text-[#800020] text-xs uppercase animate-pulse">Sedang Mencatat Kehadiran...</p>
-          </div>
-        </div>
-      )}
+      <p className="mt-6 text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Satu NPM hanya diperbolehkan satu kali absen per hari</p>
     </div>
   );
 }

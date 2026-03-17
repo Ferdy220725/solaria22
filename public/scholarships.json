@@ -1,0 +1,60 @@
+[
+  {
+    "nama": "Pusat Informasi Official",
+    "instansi": "UPN Veteran Jawa Timur",
+    "link_univ": "https://www.instagram.com/upnveteranjawatimur?igsh=MWV1ZG9pNTVxdjZwZQ==",
+    "link_fakultas": "https://www.instagram.com/fapertaupnvjt?igsh=dGYyand5ZWtzNHk=",
+    "link_prodi": "https://www.instagram.com/agroteknologi_upnvjatim?igsh=MWhpOTJ4ZW1yajk0Yg==",
+    "kategori": "Kampus",
+    "deadline": "2030-12-31"
+  },
+  {
+    "nama": "Internal UPN Veteran Jatim",
+    "instansi": "Rektorat UPNVJT",
+    "deadline": "2026-04-15",
+    "link": "https://upnjatim.ac.id/beasiswa/",
+    "kategori": "Kampus"
+  },
+  {
+    "nama": "Beasiswa Tanoto Foundation",
+    "instansi": "Tanoto Foundation",
+    "deadline": "2025-09-07",
+    "link": "https://www.tanotofoundation.org/id/teladan-2026/",
+    "kategori": "Nasional/Prestasi"
+  },
+  {
+    "nama": "Beasiswa Unggulan",
+    "instansi": "Kemendikbudristek",
+    "deadline": "2026-06-30",
+    "link": "https://beasiswaunggulan.kemendikdasmen.go.id/",
+    "kategori": "Nasional"
+  },
+  {
+    "nama": "Beasiswa Bank Indonesia",
+    "instansi": "GenBI Jatim",
+    "deadline": "2026-03-25",
+    "link": "https://www.generasibaruindonesia.com/beasiswa",
+    "kategori": "Instansi"
+  },
+  {
+    "nama": "Djarum Beasiswa Plus",
+    "instansi": "Djarum Foundation",
+    "deadline": "2026-06-03",
+    "link": "https://djarumbeasiswaplus.org/",
+    "kategori": "Swasta"
+  },
+  {
+    "nama": "KIP Kuliah Merdeka",
+    "instansi": "Kemendikbudristek",
+    "deadline": "2026-10-31",
+    "link": "https://kip-kuliah.kemdiktisaintek.go.id/",
+    "kategori": "Pemerintah"
+  },
+  {
+    "nama": "Paragon Scholarship",
+    "instansi": "PT Paragon Technology",
+    "deadline": "2026-05-28",
+    "link": "https://www.paragon-innovation.com/scholarship",
+    "kategori": "Industri"
+  }
+]

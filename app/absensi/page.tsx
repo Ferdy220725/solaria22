@@ -99,7 +99,7 @@ export default function AbsensiMahasiswa() {
 
     try {
       const now = new Date();
-      const wibOffset = 7 * 60 * 60 * 1000;
+      const wibOffset = 7 * 60 * 60 ;
       const wibTime = new Date(now.getTime() + wibOffset);
       const today = wibTime.toISOString().split('T')[0];
 

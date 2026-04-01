@@ -16,16 +16,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchTugas = async () => {
-      // Pastikan kolom 'deskripsi' ikut dipanggil dalam select('*')
       const { data, error } = await supabase
         .from('tugas_perkuliahan')
         .select('*')
         .order('deadline', { ascending: true });
       
-      if (data) {
-        console.log("Data Tugas dari Supabase:", data); // Cek console log untuk memastikan kolom deskripsi ada isinya
-        setTugas(data);
-      }
+      if (data) setTugas(data);
       if (error) console.error("Error fetching tasks:", error);
     };
     fetchTugas();
@@ -42,6 +38,13 @@ export default function Dashboard() {
     const savedName = localStorage.getItem('nama_user_solaria');
     if (savedName) { setDisplayName(savedName.split(' ')[0]); }
   }, [supabase]);
+
+  // FUNGSI CEK DEADLINE (LOGIKA OTOMATIS)
+  const isExpired = (deadline: string) => {
+    const now = new Date();
+    const limit = new Date(deadline);
+    return now > limit;
+  };
 
   const handleGoToAbsensi = async () => {
     const { data } = await supabase.from('status_sistem').select('is_active').eq('id', 'absensi').maybeSingle();
@@ -95,29 +98,37 @@ export default function Dashboard() {
           <div className="bg-white p-6 rounded-2xl shadow-sm border-t-8 border-[#004d40]">
             <h2 className="text-sm font-black text-slate-800 uppercase mb-6 border-b pb-2 tracking-widest">Informasi Tugas Perkuliahan</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {tugas.map((t) => (
-                <div key={t.id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col h-full">
+              {tugas.map((t) => {
+                const telat = isExpired(t.deadline); // Cek status disini
+                
+                return (
+                <div key={t.id} className={`p-5 rounded-2xl border flex flex-col h-full transition-all ${telat ? 'bg-slate-100 border-slate-200 grayscale-[0.5]' : 'bg-slate-50 border-slate-100'}`}>
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] font-black bg-[#004d40] text-white px-2 py-0.5 rounded uppercase">Kuliah</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${telat ? 'bg-slate-400 text-white' : 'bg-[#004d40] text-white'}`}>Kuliah</span>
                     <span className="text-[10px] font-black text-slate-400 uppercase">{t.mk_nama}</span>
                   </div>
                   <p className="font-black text-slate-800 text-md mb-1 uppercase leading-tight">{t.judul_tugas}</p>
-                  <p className="text-red-600 font-bold text-[10px] mb-3 uppercase">⏰ Deadline: {new Date(t.deadline).toLocaleString('id-ID')}</p>
+                  <p className={`${telat ? 'text-slate-400' : 'text-red-600'} font-bold text-[10px] mb-3 uppercase`}>
+                    {telat ? '❌ DEADLINE BERAKHIR' : `⏰ Deadline: ${new Date(t.deadline).toLocaleString('id-ID')}`}
+                  </p>
                   
-                  {/* LOGIKA PENAMPILAN DESKRIPSI YANG DIPERKUAT */}
-                  {t.deskripsi && t.deskripsi.trim() !== "" ? (
+                  {t.deskripsi && t.deskripsi.trim() !== "" && (
                     <div className="mb-4 p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
                        <p className="text-[11px] text-slate-600 leading-relaxed italic whitespace-pre-line">
                          {t.deskripsi}
                        </p>
                     </div>
-                  ) : null}
-
-                  {t.link_pengumpulan && (
-                    <a href={t.link_pengumpulan} target="_blank" rel="noopener noreferrer" className="mt-auto block w-full bg-[#004d40] text-white text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition-all">Kumpulkan Tugas →</a>
                   )}
+
+                  {/* LOGIKA LINK: Hanya muncul jika belum telat */}
+                  {t.link_pengumpulan && !telat ? (
+                    <a href={t.link_pengumpulan} target="_blank" rel="noopener noreferrer" className="mt-auto block w-full bg-[#004d40] text-white text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition-all hover:bg-black">Kumpulkan Tugas →</a>
+                  ) : t.link_pengumpulan && telat ? (
+                    <div className="mt-auto block w-full bg-slate-300 text-slate-500 text-center py-2.5 rounded-xl text-[10px] font-black uppercase cursor-not-allowed">Akses Ditutup</div>
+                  ) : null}
                 </div>
-              ))}
+                );
+              })}
               {tugas.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold italic text-xs uppercase tracking-widest">Belum ada tugas aktif.</div>}
             </div>
           </div>

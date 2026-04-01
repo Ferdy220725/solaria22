@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '../../utils/supabase/client';
 
-// Daftar Mahasiswa tetap sama
+// Daftar Mahasiswa tetap dipertahankan sesuai aslinya
 const DAFTAR_MAHASISWA = [
   { npm: "25025010093", nama: "SITI NUR FADILAH" },
   { npm: "25025010094", nama: "AGNIA LAQUINTA A-ABIN" },
@@ -60,10 +60,10 @@ export default function AbsensiMahasiswa() {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // --- STATE BARU UNTUK KODE ---
+  // --- STATE UNTUK KODE AKSES DINAMIS ---
   const [inputKode, setInputKode] = useState('');
   const [isVerified, setIsVerified] = useState(false);
-  const [kodeBenar, setKodeBenar] = useState('');
+  const [kodeBenarDariDB, setKodeBenarDariDB] = useState('');
   
   const supabase = createClient();
 
@@ -72,7 +72,7 @@ export default function AbsensiMahasiswa() {
   }, []);
 
   const checkStatus = async () => {
-    // Mengambil status sistem DAN kode akses sekaligus
+    // Mengambil status AKTIF dan KODE AKSES terbaru dari tabel status_sistem
     const { data } = await supabase
       .from('status_sistem')
       .select('is_active, kode_akses')
@@ -80,15 +80,15 @@ export default function AbsensiMahasiswa() {
       .maybeSingle();
     
     setIsOpen(data?.is_active || false);
-    setKodeBenar(data?.kode_akses || '');
+    setKodeBenarDariDB(data?.kode_akses || '');
     setLoading(false);
   };
 
-  const handleVerifikasi = () => {
-    if (inputKode.toUpperCase() === kodeBenar.toUpperCase()) {
+  const handleVerifikasiKode = () => {
+    if (inputKode.toUpperCase() === kodeBenarDariDB.toUpperCase()) {
       setIsVerified(true);
     } else {
-      alert("Kode Absensi Salah! Silakan cek kembali.");
+      alert("Kode Absensi Salah! Silakan hubungi Admin/Dosen.");
     }
   };
 
@@ -118,6 +118,7 @@ export default function AbsensiMahasiswa() {
       const wibTime = new Date(now.getTime() + wibOffset);
       const today = wibTime.toISOString().split('T')[0];
 
+      // Cek apakah sudah absen hari ini
       const { data: existing } = await supabase
         .from('absensi')
         .select('id')
@@ -132,6 +133,7 @@ export default function AbsensiMahasiswa() {
         return;
       }
 
+      // Simpan data absen
       const { error } = await supabase
         .from('absensi')
         .insert([{
@@ -152,12 +154,12 @@ export default function AbsensiMahasiswa() {
     }
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center font-bold text-slate-400 uppercase tracking-widest animate-pulse">LOADING...</div>;
+  if (loading) return <div className="flex h-screen items-center justify-center font-bold text-slate-400 uppercase tracking-widest">LOADING...</div>;
 
   if (!isOpen) return (
     <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
       <div className="text-center bg-white p-10 rounded-[40px] shadow-xl border-t-[10px] border-red-600 max-w-md w-full">
-        <h1 className="text-3xl font-black text-red-600 mb-4 uppercase tracking-tighter">ABSEN CLOSED</h1>
+        <h1 className="text-3xl font-black text-red-600 mb-4 uppercase">ABSEN CLOSED</h1>
         <p className="font-bold text-slate-500 uppercase text-xs">Sistem sedang ditutup oleh Admin.</p>
       </div>
     </div>
@@ -176,40 +178,40 @@ export default function AbsensiMahasiswa() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 font-sans">
+    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6">
       
-      {/* JIKA BELUM VERIFIKASI KODE */}
+      {/* TAMPILAN 1: INPUT KODE (GERBANG AWAL) */}
       {!isVerified ? (
         <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden border-t-[10px] border-[#800020] p-10 animate-in fade-in zoom-in duration-500">
            <div className="text-center mb-8">
             <div className="text-4xl mb-4">🔐</div>
-            <h1 className="text-2xl font-black text-[#800020] uppercase tracking-tighter">Kode Akses</h1>
-            <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Masukkan kode dari Dosen atau Ketua Kelas</p>
+            <h1 className="text-2xl font-black text-[#800020] uppercase tracking-tighter">Masukkan Kode</h1>
+            <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Minta kode akses ke dosen atau admin</p>
           </div>
 
           <div className="space-y-4">
             <input 
               type="text" 
-              placeholder="MASUKKAN KODE DISINI"
+              placeholder="KODE DISINI"
               value={inputKode}
               onChange={(e) => setInputKode(e.target.value)}
               className="w-full p-5 bg-slate-50 border-2 border-slate-100 focus:border-[#800020] rounded-2xl outline-none font-black text-center uppercase tracking-widest transition-all"
             />
             <button 
-              onClick={handleVerifikasi}
+              onClick={handleVerifikasiKode}
               className="w-full py-5 rounded-2xl bg-[#800020] text-white font-black uppercase shadow-lg hover:bg-black active:scale-95 transition-all"
             >
-              Verifikasi & Absen →
+              Verifikasi & Buka Form →
             </button>
           </div>
         </div>
       ) : (
-        /* TAMPILAN ASLI FORMULIR ABSENSI (TIDAK BERUBAH) */
+        /* TAMPILAN 2: FORMULIR ABSENSI ASLI (MUNCUL SETELAH KODE BENAR) */
         <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden border-t-[10px] border-[#800020] animate-in slide-in-from-bottom-10 duration-500">
           <div className="p-10">
             <div className="mb-8 text-center">
               <h1 className="text-2xl font-black text-[#800020] uppercase">Absensi Mahasiswa</h1>
-              <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Pilih nama atau isi manual jika tidak ada</p>
+              <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Status: Terverifikasi ✅</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -258,8 +260,7 @@ export default function AbsensiMahasiswa() {
           </div>
         </div>
       )}
-
-      {/* Bagian footer tetap asli */}
+      
       <p className="mt-6 text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Satu NPM hanya diperbolehkan satu kali absen per hari</p>
     </div>
   );

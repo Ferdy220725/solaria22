@@ -14,6 +14,9 @@ export default function SuperAdminPage() {
   const [tugasKuliah, setTugasKuliah] = useState<any[]>([]);
   const [absensi, setAbsensi] = useState<any[]>([]);
   const [absensiEnabled, setAbsensiEnabled] = useState(false);
+  
+  // --- STATE BARU UNTUK KODE ABSEN ---
+  const [kodeAbsen, setKodeAbsen] = useState('');
 
   // State Input
   const [judulPrak, setJudulPrak] = useState('');
@@ -47,11 +50,13 @@ export default function SuperAdminPage() {
       if (dKuliah) setTugasKuliah(dKuliah);
     } 
     if (role === 'ABSEN') {
-      // MENGAMBIL DATA MAHASISWA YANG SUDAH ABSEN
       const { data: dAbsen } = await supabase.from('absensi').select('*').order('waktu_absen', { ascending: false });
       const { data: sAbsen } = await supabase.from('status_sistem').select('*').eq('id', 'absensi').maybeSingle();
       if (dAbsen) setAbsensi(dAbsen);
-      if (sAbsen) setAbsensiEnabled(sAbsen.is_active);
+      if (sAbsen) {
+        setAbsensiEnabled(sAbsen.is_active);
+        setKodeAbsen(sAbsen.kode_akses || ''); // Ambil kode yang ada di DB
+      }
     }
   };
 
@@ -112,6 +117,17 @@ export default function SuperAdminPage() {
     if (!error) setAbsensiEnabled(status);
   };
 
+  // --- FUNGSI BARU UNTUK UPDATE KODE ---
+  const updateKodeAbsen = async () => {
+    const { error } = await supabase
+      .from('status_sistem')
+      .update({ kode_akses: kodeAbsen.toUpperCase() })
+      .eq('id', 'absensi');
+    
+    if (!error) alert("Kode Absen Berhasil Diperbarui: " + kodeAbsen.toUpperCase());
+    else alert("Gagal Update Kode!");
+  };
+
   if (role === 'GUEST') return (
     <div className="flex h-screen items-center justify-center bg-slate-50">
       <form onSubmit={handleLogin} className="p-8 bg-white shadow-xl rounded-3xl border-t-8 border-[#800020] w-full max-w-sm text-center">
@@ -130,7 +146,6 @@ export default function SuperAdminPage() {
       </div>
 
       {role === 'WEB' ? (
-        /* PANEL KONTEN (Tugas, Materi, Izin) */
         <div className="space-y-10">
           <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#004d40]">
@@ -151,8 +166,8 @@ export default function SuperAdminPage() {
               <select className="w-full border p-3 mb-2 rounded-xl text-xs font-bold" value={golongan} onChange={e => setGolongan(e.target.value)}>
                 {mkPrak === 'DIT' ? (<><option value="B1">GOL B1</option><option value="B3">GOL B3</option><option value="C3">GOL C3</option></>) : (<><option value="C1">GOL C1</option><option value="C2">GOL C2</option><option value="C3">GOL C3</option></>)}
               </select>
-              <input type="text" placeholder="Judul" className="w-full border p-3 mb-2 rounded-xl text-xs" onChange={e => setJudulPrak(e.target.value)} />
-              <input type="datetime-local" className="w-full border p-3 mb-4 rounded-xl text-xs" onChange={e => setDeadlinePrak(e.target.value)} />
+              <input type="text" placeholder="Judul" className="w-full border p-3 mb-2 rounded-xl text-xs" value={judulPrak} onChange={e => setJudulPrak(e.target.value)} />
+              <input type="datetime-local" className="w-full border p-3 mb-4 rounded-xl text-xs" value={deadlinePrak} onChange={e => setDeadlinePrak(e.target.value)} />
               <button onClick={handlePostTugasPrak} className="w-full bg-[#D4AF37] text-white py-3 rounded-xl font-black text-xs">PUBLISH</button>
             </div>
 
@@ -187,13 +202,32 @@ export default function SuperAdminPage() {
           </div>
         </div>
       ) : (
-        /* PANEL ABSENSI (KEMBALI KE SEMULA + HISTORY) */
+        /* PANEL ABSENSI */
         <div className="space-y-6">
-          <div className="bg-white p-10 rounded-[40px] shadow-sm text-center border-l-8 border-blue-600">
-            <h2 className="font-black text-slate-800 uppercase text-lg mb-4">Pintu Absensi</h2>
-            <button onClick={() => toggleAbsensi(!absensiEnabled)} className={`px-16 py-6 rounded-3xl font-black text-xl transition-all shadow-xl ${absensiEnabled ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-              {absensiEnabled ? 'SISTEM: OPEN' : 'SISTEM: CLOSED'}
-            </button>
+          <div className="grid md:grid-cols-2 gap-6">
+             {/* KENDALI PINTU ABSENSI */}
+             <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-blue-600">
+                <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Pintu Absensi</h2>
+                <button onClick={() => toggleAbsensi(!absensiEnabled)} className={`w-full py-4 rounded-2xl font-black text-sm transition-all shadow-lg ${absensiEnabled ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+                  {absensiEnabled ? 'SISTEM: OPEN' : 'SISTEM: CLOSED'}
+                </button>
+             </div>
+
+             {/* KENDALI KODE ABSENSI (FITUR BARU) */}
+             <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-[#800020]">
+                <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Kode Akses Hari Ini</h2>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="SET KODE" 
+                    className="flex-1 border-2 p-3 rounded-xl font-black text-center uppercase text-sm focus:border-[#800020] outline-none"
+                    value={kodeAbsen}
+                    onChange={e => setKodeAbsen(e.target.value)}
+                  />
+                  <button onClick={updateKodeAbsen} className="bg-[#800020] text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-md">Simpan</button>
+                </div>
+                <p className="text-[9px] text-slate-400 font-bold uppercase mt-2 italic">*Beritahu kode ini ke mahasiswa</p>
+             </div>
           </div>
 
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
@@ -210,7 +244,7 @@ export default function SuperAdminPage() {
                 <tbody>
                   {absensi.map((a, idx) => (
                     <tr key={idx} className="border-b font-bold text-slate-700">
-                      <td className="py-3 uppercase">{a.nama_lengkap}</td>
+                      <td className="py-3 uppercase">{a.nama_mahasiswa}</td> {/* Diperbaiki dari nama_lengkap sesuai tabel absensi */}
                       <td className="py-3">{a.npm}</td>
                       <td className="py-3 text-slate-400">{new Date(a.waktu_absen).toLocaleString('id-ID')}</td>
                     </tr>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '../../utils/supabase/client';
 
-// Daftar Mahasiswa yang kamu berikan
+// Daftar Mahasiswa tetap sama
 const DAFTAR_MAHASISWA = [
   { npm: "25025010093", nama: "SITI NUR FADILAH" },
   { npm: "25025010094", nama: "AGNIA LAQUINTA A-ABIN" },
@@ -59,6 +59,11 @@ export default function AbsensiMahasiswa() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // --- STATE BARU UNTUK KODE ---
+  const [inputKode, setInputKode] = useState('');
+  const [isVerified, setIsVerified] = useState(false);
+  const [kodeBenar, setKodeBenar] = useState('');
   
   const supabase = createClient();
 
@@ -67,14 +72,24 @@ export default function AbsensiMahasiswa() {
   }, []);
 
   const checkStatus = async () => {
+    // Mengambil status sistem DAN kode akses sekaligus
     const { data } = await supabase
       .from('status_sistem')
-      .select('is_active')
+      .select('is_active, kode_akses')
       .eq('id', 'absensi')
       .maybeSingle();
     
     setIsOpen(data?.is_active || false);
+    setKodeBenar(data?.kode_akses || '');
     setLoading(false);
+  };
+
+  const handleVerifikasi = () => {
+    if (inputKode.toUpperCase() === kodeBenar.toUpperCase()) {
+      setIsVerified(true);
+    } else {
+      alert("Kode Absensi Salah! Silakan cek kembali.");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,10 +142,7 @@ export default function AbsensiMahasiswa() {
 
       if (error) throw error;
 
-      // --- BAGIAN YANG DITAMBAHKAN AGAR DASHBOARD BISA MENGENALI NAMA ---
       localStorage.setItem('nama_user_solaria', finalNama);
-      // ----------------------------------------------------------------
-
       setIsSuccess(true);
       
     } catch (err: any) {
@@ -140,12 +152,12 @@ export default function AbsensiMahasiswa() {
     }
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center font-bold text-slate-400">LOADING...</div>;
+  if (loading) return <div className="flex h-screen items-center justify-center font-bold text-slate-400 uppercase tracking-widest animate-pulse">LOADING...</div>;
 
   if (!isOpen) return (
     <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
       <div className="text-center bg-white p-10 rounded-[40px] shadow-xl border-t-[10px] border-red-600 max-w-md w-full">
-        <h1 className="text-3xl font-black text-red-600 mb-4 uppercase">ABSEN CLOSED</h1>
+        <h1 className="text-3xl font-black text-red-600 mb-4 uppercase tracking-tighter">ABSEN CLOSED</h1>
         <p className="font-bold text-slate-500 uppercase text-xs">Sistem sedang ditutup oleh Admin.</p>
       </div>
     </div>
@@ -164,59 +176,90 @@ export default function AbsensiMahasiswa() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden border-t-[10px] border-[#800020]">
-        <div className="p-10">
-          <div className="mb-8 text-center">
-            <h1 className="text-2xl font-black text-[#800020] uppercase">Absensi Mahasiswa</h1>
-            <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Pilih nama atau isi manual jika tidak ada</p>
+    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 font-sans">
+      
+      {/* JIKA BELUM VERIFIKASI KODE */}
+      {!isVerified ? (
+        <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden border-t-[10px] border-[#800020] p-10 animate-in fade-in zoom-in duration-500">
+           <div className="text-center mb-8">
+            <div className="text-4xl mb-4">🔐</div>
+            <h1 className="text-2xl font-black text-[#800020] uppercase tracking-tighter">Kode Akses</h1>
+            <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Masukkan kode dari Dosen atau Ketua Kelas</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2">Cari Nama</label>
-              <select 
-                value={selectedStudent}
-                onChange={(e) => setSelectedStudent(e.target.value)}
-                className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-[#800020] rounded-2xl outline-none font-bold appearance-none cursor-pointer transition-all"
-              >
-                <option value="">-- KLIK UNTUK MEMILIH NAMA --</option>
-                {DAFTAR_MAHASISWA.map((m) => (
-                  <option key={m.npm} value={m.npm}>{m.nama}</option>
-                ))}
-                <option value="LAINNYA">--- SAYA TIDAK ADA DI DAFTAR (LAINNYA) ---</option>
-              </select>
+          <div className="space-y-4">
+            <input 
+              type="text" 
+              placeholder="MASUKKAN KODE DISINI"
+              value={inputKode}
+              onChange={(e) => setInputKode(e.target.value)}
+              className="w-full p-5 bg-slate-50 border-2 border-slate-100 focus:border-[#800020] rounded-2xl outline-none font-black text-center uppercase tracking-widest transition-all"
+            />
+            <button 
+              onClick={handleVerifikasi}
+              className="w-full py-5 rounded-2xl bg-[#800020] text-white font-black uppercase shadow-lg hover:bg-black active:scale-95 transition-all"
+            >
+              Verifikasi & Absen →
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* TAMPILAN ASLI FORMULIR ABSENSI (TIDAK BERUBAH) */
+        <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden border-t-[10px] border-[#800020] animate-in slide-in-from-bottom-10 duration-500">
+          <div className="p-10">
+            <div className="mb-8 text-center">
+              <h1 className="text-2xl font-black text-[#800020] uppercase">Absensi Mahasiswa</h1>
+              <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Pilih nama atau isi manual jika tidak ada</p>
             </div>
 
-            {selectedStudent === "LAINNYA" && (
-              <div className="space-y-4 animate-in fade-in duration-500">
-                <input 
-                  type="text" 
-                  placeholder="MASUKKAN NAMA LENGKAP"
-                  className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold uppercase"
-                  value={namaManual}
-                  onChange={(e) => setNamaManual(e.target.value)}
-                />
-                <input 
-                  type="number" 
-                  placeholder="MASUKKAN NPM"
-                  className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold"
-                  value={npmManual}
-                  onChange={(e) => setNpmManual(e.target.value)}
-                />
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2">Cari Nama</label>
+                <select 
+                  value={selectedStudent}
+                  onChange={(e) => setSelectedStudent(e.target.value)}
+                  className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-[#800020] rounded-2xl outline-none font-bold appearance-none cursor-pointer transition-all"
+                >
+                  <option value="">-- KLIK UNTUK MEMILIH NAMA --</option>
+                  {DAFTAR_MAHASISWA.map((m) => (
+                    <option key={m.npm} value={m.npm}>{m.nama}</option>
+                  ))}
+                  <option value="LAINNYA">--- SAYA TIDAK ADA DI DAFTAR (LAINNYA) ---</option>
+                </select>
               </div>
-            )}
 
-            <button 
-              disabled={isSubmitting}
-              type="submit" 
-              className={`w-full py-5 rounded-2xl font-black text-white uppercase shadow-lg transition-all ${isSubmitting ? 'bg-slate-400' : 'bg-[#800020] hover:bg-black active:scale-95'}`}
-            >
-              {isSubmitting ? 'MEMPROSES...' : 'KIRIM ABSENSI'}
-            </button>
-          </form>
+              {selectedStudent === "LAINNYA" && (
+                <div className="space-y-4 animate-in fade-in duration-500">
+                  <input 
+                    type="text" 
+                    placeholder="MASUKKAN NAMA LENGKAP"
+                    className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold uppercase"
+                    value={namaManual}
+                    onChange={(e) => setNamaManual(e.target.value)}
+                  />
+                  <input 
+                    type="number" 
+                    placeholder="MASUKKAN NPM"
+                    className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold"
+                    value={npmManual}
+                    onChange={(e) => setNpmManual(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <button 
+                disabled={isSubmitting}
+                type="submit" 
+                className={`w-full py-5 rounded-2xl font-black text-white uppercase shadow-lg transition-all ${isSubmitting ? 'bg-slate-400' : 'bg-[#800020] hover:bg-black active:scale-95'}`}
+              >
+                {isSubmitting ? 'MEMPROSES...' : 'KIRIM ABSENSI'}
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Bagian footer tetap asli */}
       <p className="mt-6 text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Satu NPM hanya diperbolehkan satu kali absen per hari</p>
     </div>
   );

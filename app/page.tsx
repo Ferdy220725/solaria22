@@ -56,10 +56,18 @@ export default function Dashboard() {
     return new Date() > new Date(deadline);
   };
 
+  // --- TEMPLATE PESAN DOSEN (SAKLEK) ---
   const handleShareDosen = (m: any) => {
     const linkAsli = `https://meet.jit.si/${m.room_id}`;
     const formatWaktu = formatKeWIB(m.tanggal_jam);
-    const teks = `Permisi Pak/Bu maaf mengganggu waktunya mohon izin mengirimkan informasi kegiatan perkuliahan secara online untuk mata kuliah [.....],%0A%0AAgenda: ${m.judul}%0AWaktu: ${formatWaktu} WIB%0ALink Meeting: ${linkAsli}%0APasscode: ${m.passcode || '-'}%0A%0ATerima kasih`;
+    
+    const teks = `Permisi Pak/Bu maaf mengganggu waktunya mohon izin mengirimkan informasi kegiatan perkuliahan secara online untuk mata kuliah,%0A%0A` +
+                 `Agenda: ${m.judul}%0A` +
+                 `Waktu: ${formatWaktu} WIB%0A` +
+                 `Link Meeting: ${linkAsli}%0A` +
+                 `Passcode: ${m.passcode || '-'}%0A%0A` +
+                 `Terima kasih atas perhatiannya`;
+                 
     window.open(`https://wa.me/?text=${teks}`, '_blank');
   };
 
@@ -69,7 +77,10 @@ export default function Dashboard() {
     const finalRoomId = newMeeting.room_id || `Solaria-${newMeeting.judul.replace(/\s+/g, '-')}-${Math.floor(Math.random() * 1000)}`;
 
     const { error } = await supabase.from('jadwal_meeting').insert([{ 
-      judul: newMeeting.judul, tanggal_jam: waktuISO_WIB, room_id: finalRoomId, passcode: newMeeting.passcode 
+      judul: newMeeting.judul, 
+      tanggal_jam: waktuISO_WIB, 
+      room_id: finalRoomId, 
+      passcode: newMeeting.passcode // Passcode disimpan ke database
     }]);
 
     if (error) alert("Gagal: " + error.message);
@@ -105,7 +116,6 @@ export default function Dashboard() {
   return (
     <div className="p-8 max-w-7xl mx-auto min-h-screen bg-slate-50 font-sans text-slate-800 animate-in fade-in duration-700">
       
-      {/* MODAL MEETING JITSI */}
       {showMeeting && (
         <div className="fixed inset-0 z-[999] bg-black flex flex-col">
           <div className="p-4 bg-[#800020] flex justify-between items-center text-white">
@@ -116,13 +126,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* MODAL ADMIN PANEL */}
       {showAdminForm && (
         <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 text-slate-800">
           <div className="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl border-b-8 border-blue-600">
             {!isAdminVerified ? (
               <div className="text-center">
-                <h2 className="font-black text-[#800020] uppercase mb-4 tracking-tighter">Verifikasi Admin</h2>
+                <h2 className="font-black text-[#800020] uppercase mb-4 tracking-tighter text-xl">Verifikasi Admin</h2>
                 <input type="password" placeholder="Password Admin..." className="w-full p-4 rounded-2xl border-2 border-slate-100 mb-4 focus:border-blue-500 outline-none text-center font-bold" value={adminPass} onChange={(e) => setAdminPass(e.target.value)}/>
                 <div className="flex gap-2">
                   <button onClick={() => setShowAdminForm(false)} className="flex-1 py-3 text-[10px] font-black uppercase text-slate-400">Batal</button>
@@ -134,11 +143,16 @@ export default function Dashboard() {
                 <h2 className="font-black text-blue-600 uppercase text-center mb-2 tracking-tighter text-xl">Atur Jadwal Meeting</h2>
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Nama Agenda</label>
-                  <input type="text" className="w-full p-3 rounded-xl border border-slate-200 text-[11px] font-bold" onChange={e => setNewMeeting({...newMeeting, judul: e.target.value})}/>
+                  <input type="text" className="w-full p-3 rounded-xl border border-slate-200 text-[11px] font-bold" value={newMeeting.judul} onChange={e => setNewMeeting({...newMeeting, judul: e.target.value})}/>
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Waktu (WIB)</label>
                   <input type="datetime-local" className="w-full p-3 rounded-xl border border-slate-200 text-[11px] font-bold uppercase" onChange={e => setNewMeeting({...newMeeting, tanggal_jam: e.target.value})}/>
+                </div>
+                {/* FITUR PASSCODE KEMBALI DIMASUKKAN */}
+                <div>
+                  <label className="text-[10px] font-black text-blue-600 uppercase ml-1">Passcode Meeting</label>
+                  <input type="text" placeholder="Contoh: 12345" className="w-full p-3 rounded-xl border border-blue-200 text-[11px] font-bold" value={newMeeting.passcode} onChange={e => setNewMeeting({...newMeeting, passcode: e.target.value})}/>
                 </div>
                 <button onClick={handleSaveMeeting} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase text-xs shadow-lg shadow-blue-200 mt-2 hover:bg-black transition-all">Simpan Jadwal →</button>
                 <button onClick={() => {setShowAdminForm(false); setIsAdminVerified(false);}} className="w-full text-[9px] font-black text-slate-400 uppercase tracking-widest mt-2">Selesai</button>
@@ -152,30 +166,29 @@ export default function Dashboard() {
       <div className="mb-10 flex flex-col md:flex-row justify-between items-center md:items-end gap-4">
         <div>
           <h1 className="text-4xl font-extrabold text-[#800020] mb-2 uppercase tracking-tighter">Dashboard Agrotek C</h1>
-          <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">Pusat Informasi & Manajemen Kelas</p>
+          <p className="text-slate-500 font-bold text-xs uppercase tracking-widest text-slate-400">Pusat Informasi & Manajemen Kelas</p>
         </div>
         <button onClick={() => setShowDashboard(false)} className="text-[10px] font-black text-slate-400 hover:text-[#800020] uppercase border-b border-transparent hover:border-[#800020] pb-1 transition-all">← Kembali</button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* KOLOM KIRI */}
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-blue-600">
             <div className="flex justify-between items-center mb-4 border-b pb-2">
               <h2 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">📅 Agenda Meeting</h2>
-              <button onClick={() => setShowAdminForm(true)} className="w-6 h-6 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all">
-                <span className="font-bold text-lg">{isAdminVerified ? '✓' : '+'}</span>
+              <button onClick={() => setShowAdminForm(true)} className="w-6 h-6 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all font-bold">
+                {isAdminVerified ? '✓' : '+'}
               </button>
             </div>
             <div className="space-y-3">
               {meetings.map((m) => (
                 <div key={m.id} className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 group transition-all relative">
                   {isAdminVerified && (
-                    <button onClick={() => handleDeleteMeeting(m.id)} className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full text-[10px] flex items-center justify-center shadow-lg hover:scale-110 transition-all z-20">✕</button>
+                    <button onClick={() => handleDeleteMeeting(m.id)} className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full text-[10px] flex items-center justify-center shadow-lg hover:scale-110 transition-all z-20 font-bold">✕</button>
                   )}
                   <p className="font-black text-blue-900 text-[11px] uppercase mb-1">{m.judul}</p>
                   <p className="text-[9px] font-bold text-blue-600/70 mb-3 uppercase">{formatKeWIB(m.tanggal_jam)} WIB</p>
+                  {m.passcode && <p className="text-[8px] font-black text-blue-400 uppercase mb-2">Passcode: {m.passcode}</p>}
                   <div className="grid grid-cols-2 gap-2">
                     <button onClick={() => { setActiveRoom(m.room_id); setShowMeeting(true); }} className="bg-blue-600 text-white py-2 rounded-lg text-[9px] font-black uppercase hover:bg-black transition-all">Join</button>
                     <button onClick={() => handleShareDosen(m)} className="bg-white border border-blue-200 text-blue-600 py-2 rounded-lg text-[9px] font-black uppercase hover:bg-blue-50 transition-all text-center">Dosen</button>
@@ -185,11 +198,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl shadow-sm border-t-8 border-[#800020]">
-            <h2 className="text-sm font-black text-slate-800 uppercase mb-4 border-b pb-2 tracking-widest">Jadwal Kuliah</h2>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border-t-8 border-[#800020] text-slate-800">
+            <h2 className="text-sm font-black uppercase mb-4 border-b pb-2 tracking-widest">Jadwal Kuliah</h2>
             <ul className="space-y-4">
               {["Senin (08.41 - 14.40): Genetika", "Selasa (08.41 - 10.21): DBT", "Rabu (07.00 - 08.40): Fistan", "Kamis (13.00 - 14.40): DIT", "Jumat (08.00 - 09.40): DPT"].map((j, i) => (
-                <li key={i} className="text-[11px] font-bold text-slate-700 uppercase border-b pb-2">{j}</li>
+                <li key={i} className="text-[11px] font-bold text-slate-700 uppercase border-b pb-2 last:border-0">{j}</li>
               ))}
             </ul>
           </div>
@@ -200,30 +213,24 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* KOLOM KANAN */}
         <div className="lg:col-span-2 space-y-8">
-          
-          {/* TUGAS PERKULIAHAN (FIX DESKRIPSI) */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border-t-8 border-[#004d40]">
             <h2 className="text-sm font-black text-slate-800 uppercase mb-6 border-b pb-2 tracking-widest">Tugas Perkuliahan</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {tugas.map((t) => {
                 const telat = isExpired(t.deadline);
                 return (
-                  <div key={t.id} className="p-5 rounded-2xl border bg-slate-50 border-slate-100 flex flex-col h-full shadow-sm text-slate-800">
+                  <div key={t.id} className="p-5 rounded-2xl border bg-slate-50 border-slate-100 flex flex-col h-full shadow-sm">
                     <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${telat ? 'bg-slate-400' : 'bg-[#004d40]'} text-white w-fit mb-2`}>Kuliah</span>
                     <p className="font-black text-slate-800 text-md mb-1 uppercase leading-tight">{t.judul_tugas}</p>
                     <p className={`${telat ? 'text-slate-400' : 'text-red-600'} font-bold text-[10px] mb-3 uppercase tracking-tighter`}>
                       {telat ? '❌ DEADLINE BERAKHIR' : `⏰ Deadline: ${new Date(t.deadline).toLocaleString('id-ID', {timeZone: 'Asia/Jakarta'})}`}
                     </p>
-                    
-                    {/* BAGIAN DESKRIPSI YANG SEMPAT HILANG */}
                     {t.deskripsi && (
                       <div className="mb-4 p-3 bg-white rounded-xl border border-slate-200">
                         <p className="text-[11px] text-slate-600 leading-relaxed italic whitespace-pre-line">{t.deskripsi}</p>
                       </div>
                     )}
-                    
                     {t.link_pengumpulan && !telat && (
                       <a href={t.link_pengumpulan} target="_blank" className="mt-auto block w-full bg-[#004d40] text-white text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition-all hover:bg-black">Kumpulkan →</a>
                     )}
@@ -233,13 +240,12 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* BEASISWA */}
           <div className="bg-white rounded-2xl shadow-sm border-t-8 border-orange-500 overflow-hidden text-slate-800">
             <button onClick={() => setIsScholarshipOpen(!isScholarshipOpen)} className="w-full p-6 flex justify-between items-center hover:bg-orange-50/30 transition-all">
               <div className="flex items-center gap-4">
                 <span className="text-3xl text-orange-500">{isScholarshipOpen ? "📂" : "📁"}</span>
                 <div className="text-left">
-                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Informasi Beasiswa</h2>
+                  <h2 className="text-sm font-black uppercase tracking-widest">Informasi Beasiswa</h2>
                   <p className="text-[10px] font-bold text-slate-400 uppercase">{beasiswa.length} Info Tersedia</p>
                 </div>
               </div>
@@ -261,7 +267,6 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-
         </div>
       </div>
     </div>

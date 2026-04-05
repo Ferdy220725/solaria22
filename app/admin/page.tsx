@@ -14,8 +14,6 @@ export default function SuperAdminPage() {
   const [tugasKuliah, setTugasKuliah] = useState<any[]>([]);
   const [absensi, setAbsensi] = useState<any[]>([]);
   const [absensiEnabled, setAbsensiEnabled] = useState(false);
-  
-  // --- STATE BARU UNTUK KODE ABSEN ---
   const [kodeAbsen, setKodeAbsen] = useState('');
 
   // State Input
@@ -41,21 +39,36 @@ export default function SuperAdminPage() {
   };
 
   const fetchData = async () => {
+    const sekarang = new Date();
+
     if (role === 'WEB') {
       const { data: dIzin } = await supabase.from('perizinan').select('*').order('created_at', { ascending: false });
       const { data: dPrak } = await supabase.from('tugas_praktikum').select('*').order('deadline', { ascending: true });
       const { data: dKuliah } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
+      
       if (dIzin) setIzins(dIzin);
-      if (dPrak) setTugasPrak(dPrak);
+      
+      // LOGIKA AUTO-HIDE H+3 KHUSUS PRAKTIKUM
+      if (dPrak) {
+        const prakAktif = dPrak.filter((t) => {
+          const tglDeadline = new Date(t.deadline);
+          const batasHapus = new Date(tglDeadline);
+          batasHapus.setDate(tglDeadline.getDate() + 3); // H+3
+          return sekarang <= batasHapus;
+        });
+        setTugasPrak(prakAktif);
+      }
+
       if (dKuliah) setTugasKuliah(dKuliah);
     } 
+
     if (role === 'ABSEN') {
       const { data: dAbsen } = await supabase.from('absensi').select('*').order('waktu_absen', { ascending: false });
       const { data: sAbsen } = await supabase.from('status_sistem').select('*').eq('id', 'absensi').maybeSingle();
       if (dAbsen) setAbsensi(dAbsen);
       if (sAbsen) {
         setAbsensiEnabled(sAbsen.is_active);
-        setKodeAbsen(sAbsen.kode_akses || ''); // Ambil kode yang ada di DB
+        setKodeAbsen(sAbsen.kode_akses || '');
       }
     }
   };
@@ -70,6 +83,7 @@ export default function SuperAdminPage() {
   };
 
   const handlePostTugasKuliah = async () => {
+    if(!judulKuliah || !deadlineKuliah) return alert("Isi Judul & Deadline!");
     const { error } = await supabase.from('tugas_perkuliahan').insert([{
       judul_tugas: judulKuliah.trim(), mk_nama: mkKuliah.trim(), 
       deadline: formatToWIB(deadlineKuliah), deskripsi: deskripsiKuliah.trim(),
@@ -83,15 +97,16 @@ export default function SuperAdminPage() {
   };
 
   const handlePostTugasPrak = async () => {
+    if(!judulPrak || !deadlinePrak) return alert("Isi Judul & Deadline!");
     const { error } = await supabase.from('tugas_praktikum').insert([{
       judul_tugas: judulPrak.trim(), mk_nama: mkPrak.trim().toUpperCase(), golongan: golongan.trim().toUpperCase(),
       deadline: formatToWIB(deadlinePrak), link_pengumpulan: linkPrak.trim()
     }]);
-    if (!error) { alert("Tugas Praktikum Terbit!"); fetchData(); }
+    if (!error) { alert("Tugas Praktikum Terbit!"); setJudulPrak(''); fetchData(); }
   };
 
   const handleUploadMateri = async () => {
-    if (!file) return;
+    if (!file || !judulMateri) return alert("Isi Judul & Pilih File!");
     const fileName = `${Date.now()}_${file.name}`;
     await supabase.storage.from('uploads').upload(fileName, file);
     const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(fileName);
@@ -100,7 +115,10 @@ export default function SuperAdminPage() {
   };
 
   const deleteData = async (id: string, table: string) => {
-    if (confirm("Hapus?")) { await supabase.from(table).delete().eq('id', id); fetchData(); }
+    if (confirm("Hapus data ini secara permanen?")) { 
+      await supabase.from(table).delete().eq('id', id); 
+      fetchData(); 
+    }
   };
 
   const downloadPDF = (data: any) => {
@@ -117,7 +135,6 @@ export default function SuperAdminPage() {
     if (!error) setAbsensiEnabled(status);
   };
 
-  // --- FUNGSI BARU UNTUK UPDATE KODE ---
   const updateKodeAbsen = async () => {
     const { error } = await supabase
       .from('status_sistem')
@@ -182,30 +199,48 @@ export default function SuperAdminPage() {
 
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-              <h3 className="font-black text-xs uppercase mb-4 text-slate-400">Tugas Kuliah Aktif</h3>
-              {tugasKuliah.map(t => (
-                <div key={t.id} className="p-3 mb-2 bg-slate-50 rounded-xl">
-                  <div className="flex justify-between items-center"><span className="text-[10px] font-bold uppercase">{t.mk_nama}: {t.judul_tugas}</span>
-                  <button onClick={() => deleteData(t.id, 'tugas_perkuliahan')} className="text-red-500 text-[10px] font-black">HAPUS</button></div>
+              <h3 className="font-black text-xs uppercase mb-4 text-slate-400">Daftar Tugas Aktif</h3>
+              <div className="space-y-4">
+                {/* Section Tugas Kuliah */}
+                <div>
+                  <p className="text-[9px] font-black text-blue-600 mb-2 uppercase">Perkuliahan</p>
+                  {tugasKuliah.map(t => (
+                    <div key={t.id} className="flex justify-between items-center p-3 mb-2 bg-slate-50 rounded-xl">
+                      <span className="text-[10px] font-bold uppercase">{t.mk_nama}: {t.judul_tugas}</span>
+                      <button onClick={() => deleteData(t.id, 'tugas_perkuliahan')} className="text-red-500 text-[9px] font-black hover:underline">HAPUS</button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+                {/* Section Tugas Praktikum */}
+                <div>
+                  <p className="text-[9px] font-black text-orange-600 mb-2 uppercase">Praktikum (Auto-Hide H+3)</p>
+                  {tugasPrak.map(t => (
+                    <div key={t.id} className="flex justify-between items-center p-3 mb-2 bg-slate-50 rounded-xl">
+                      <span className="text-[10px] font-bold uppercase">{t.mk_nama} ({t.golongan}): {t.judul_tugas}</span>
+                      <button onClick={() => deleteData(t.id, 'tugas_praktikum')} className="text-red-500 text-[9px] font-black hover:underline">HAPUS</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
+
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
               <h3 className="font-black text-xs uppercase mb-4 text-slate-400">Surat Izin Mahasiswa</h3>
               {izins.map(i => (
                 <div key={i.id} className="flex justify-between items-center p-2 mb-1 bg-slate-50 rounded-lg">
                   <span className="text-[10px] font-bold uppercase">{i.nama_lengkap}</span>
-                  <button onClick={() => downloadPDF(i)} className="text-[#800020] text-[10px] font-black">PDF</button>
+                  <div className="flex gap-3">
+                    <button onClick={() => downloadPDF(i)} className="text-[#800020] text-[10px] font-black">PDF</button>
+                    <button onClick={() => deleteData(i.id, 'perizinan')} className="text-red-500 text-[10px] font-black">X</button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         </div>
       ) : (
-        /* PANEL ABSENSI */
         <div className="space-y-6">
           <div className="grid md:grid-cols-2 gap-6">
-             {/* KENDALI PINTU ABSENSI */}
              <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-blue-600">
                 <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Pintu Absensi</h2>
                 <button onClick={() => toggleAbsensi(!absensiEnabled)} className={`w-full py-4 rounded-2xl font-black text-sm transition-all shadow-lg ${absensiEnabled ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
@@ -213,7 +248,6 @@ export default function SuperAdminPage() {
                 </button>
              </div>
 
-             {/* KENDALI KODE ABSENSI (FITUR BARU) */}
              <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-[#800020]">
                 <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Kode Akses Hari Ini</h2>
                 <div className="flex gap-2">
@@ -244,7 +278,7 @@ export default function SuperAdminPage() {
                 <tbody>
                   {absensi.map((a, idx) => (
                     <tr key={idx} className="border-b font-bold text-slate-700">
-                      <td className="py-3 uppercase">{a.nama_mahasiswa}</td> {/* Diperbaiki dari nama_lengkap sesuai tabel absensi */}
+                      <td className="py-3 uppercase">{a.nama_mahasiswa}</td>
                       <td className="py-3">{a.npm}</td>
                       <td className="py-3 text-slate-400">{new Date(a.waktu_absen).toLocaleString('id-ID')}</td>
                     </tr>

@@ -1,9 +1,13 @@
-self.addEventListener('push', function (event) {
+self.addEventListener('push', function(event) {
   const data = event.data.json();
   const options = {
-    body: data.body,
-    icon: '/cat.png', // Ganti dengan icon kucing kamu jika ada
-    badge: '/cat.png',
+    body: data.message,
+    icon: '/logo.png', // Pastikan kamu punya file logo.png di folder public
+    badge: '/logo.png',
+    vibrate: [100, 50, 100],
+    data: {
+      url: data.url || '/'
+    }
   };
 
   event.waitUntil(
@@ -11,9 +15,9 @@ self.addEventListener('push', function (event) {
   );
 });
 
-self.addEventListener('notificationclick', function (event) {
+self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   event.waitUntil(
-    clients.openWindow('/') // Buka dashboard saat notif di-klik
+    clients.openWindow(event.notification.data.url)
   );
 });

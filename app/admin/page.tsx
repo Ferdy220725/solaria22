@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useState, useEffect } from 'react';
 import { createClient } from '../../utils/supabase/client'; 
 import { jsPDF } from "jspdf";
@@ -8,7 +9,7 @@ export default function SuperAdminPage() {
   const [password, setPassword] = useState('');
   const supabase = createClient();
 
-  // State Data
+  // --- STATE DATA ---
   const [izins, setIzins] = useState<any[]>([]);
   const [tugasPrak, setTugasPrak] = useState<any[]>([]);
   const [tugasKuliah, setTugasKuliah] = useState<any[]>([]);
@@ -16,7 +17,7 @@ export default function SuperAdminPage() {
   const [absensiEnabled, setAbsensiEnabled] = useState(false);
   const [kodeAbsen, setKodeAbsen] = useState('');
 
-  // State Input
+  // --- STATE INPUT ---
   const [judulPrak, setJudulPrak] = useState('');
   const [mkPrak, setMkPrak] = useState('FISTAN'); 
   const [golongan, setGolongan] = useState('C1');
@@ -33,6 +34,7 @@ export default function SuperAdminPage() {
   const [mkMateri, setMkMateri] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
+  // --- HELPER ---
   const formatToWIB = (dateString: string) => {
     if (!dateString) return null;
     return `${dateString}:00+07:00`;
@@ -48,12 +50,11 @@ export default function SuperAdminPage() {
       
       if (dIzin) setIzins(dIzin);
       
-      // LOGIKA AUTO-HIDE H+3 KHUSUS PRAKTIKUM
       if (dPrak) {
         const prakAktif = dPrak.filter((t) => {
           const tglDeadline = new Date(t.deadline);
           const batasHapus = new Date(tglDeadline);
-          batasHapus.setDate(tglDeadline.getDate() + 3); // H+3
+          batasHapus.setDate(tglDeadline.getDate() + 3); 
           return sekarang <= batasHapus;
         });
         setTugasPrak(prakAktif);
@@ -73,7 +74,9 @@ export default function SuperAdminPage() {
     }
   };
 
-  useEffect(() => { if (role !== 'GUEST') fetchData(); }, [role]);
+  useEffect(() => { 
+    if (role !== 'GUEST') fetchData(); 
+  }, [role]);
 
   const handleLogin = (e: any) => {
     e.preventDefault();
@@ -82,36 +85,89 @@ export default function SuperAdminPage() {
     else alert("Password Salah!");
   };
 
+  // --- FUNGSI NOTIFIKASI UTAMA ---
+  const sendNotification = async (title: string, message: string, category: string) => {
+    console.log(`Mengirim notifikasi: ${title}...`);
+    const { error } = await supabase
+      .from('notifications')
+      .insert([{ 
+        title: title.trim(), 
+        message: message.trim(), 
+        category: category 
+      }]);
+
+    if (error) {
+      console.error("❌ Gagal simpan notifikasi:", error.message);
+    } else {
+      console.log("✅ Notifikasi tersimpan di database.");
+    }
+  };
+
+  // --- HANDLERS ---
   const handlePostTugasKuliah = async () => {
     if(!judulKuliah || !deadlineKuliah) return alert("Isi Judul & Deadline!");
+    
     const { error } = await supabase.from('tugas_perkuliahan').insert([{
-      judul_tugas: judulKuliah.trim(), mk_nama: mkKuliah.trim(), 
-      deadline: formatToWIB(deadlineKuliah), deskripsi: deskripsiKuliah.trim(),
+      judul_tugas: judulKuliah.trim(), 
+      mk_nama: mkKuliah.trim(), 
+      deadline: formatToWIB(deadlineKuliah), 
+      deskripsi: deskripsiKuliah.trim(),
       link_pengumpulan: linkKuliah.trim()
     }]);
+
     if (!error) { 
+      await sendNotification("📝 Tugas Teori Baru", `${mkKuliah.trim()}: ${judulKuliah.trim()}`, "tugas_teori");
       alert("Tugas Kuliah Terbit!"); 
       setJudulKuliah(''); setMkKuliah(''); setDeadlineKuliah(''); setDeskripsiKuliah(''); setLinkKuliah('');
       fetchData(); 
+    } else {
+      console.error("Error insert tugas:", error.message);
     }
   };
 
   const handlePostTugasPrak = async () => {
     if(!judulPrak || !deadlinePrak) return alert("Isi Judul & Deadline!");
+    
     const { error } = await supabase.from('tugas_praktikum').insert([{
-      judul_tugas: judulPrak.trim(), mk_nama: mkPrak.trim().toUpperCase(), golongan: golongan.trim().toUpperCase(),
-      deadline: formatToWIB(deadlinePrak), link_pengumpulan: linkPrak.trim()
+      judul_tugas: judulPrak.trim(), 
+      mk_nama: mkPrak.trim().toUpperCase(), 
+      golongan: golongan.trim().toUpperCase(),
+      deadline: formatToWIB(deadlinePrak), 
+      link_pengumpulan: linkPrak.trim()
     }]);
-    if (!error) { alert("Tugas Praktikum Terbit!"); setJudulPrak(''); fetchData(); }
+
+    if (!error) { 
+      await sendNotification("🔬 Tugas Praktikum Baru", `${mkPrak}: ${judulPrak.trim()} (GOL ${golongan})`, "tugas_praktikum");
+      alert("Tugas Praktikum Terbit!"); 
+      setJudulPrak(''); 
+      fetchData(); 
+    } else {
+      console.error("Error insert prak:", error.message);
+    }
   };
 
   const handleUploadMateri = async () => {
     if (!file || !judulMateri) return alert("Isi Judul & Pilih File!");
+    
     const fileName = `${Date.now()}_${file.name}`;
-    await supabase.storage.from('uploads').upload(fileName, file);
+    const { error: storageError } = await supabase.storage.from('uploads').upload(fileName, file);
+    
+    if (storageError) return alert("Gagal Upload: " + storageError.message);
+
     const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(fileName);
-    await supabase.from('materi').insert([{ judul: judulMateri.trim(), file_url: urlData.publicUrl, mk_nama: mkMateri.trim() }]);
-    alert("Materi Berhasil!");
+    
+    const { error: dbError } = await supabase.from('materi').insert([{ 
+      judul: judulMateri.trim(), 
+      file_url: urlData.publicUrl, 
+      mk_nama: mkMateri.trim() 
+    }]);
+    
+    if (!dbError) {
+      await sendNotification("📖 Materi Kuliah Baru", `${mkMateri.trim()}: ${judulMateri.trim()}`, "materi");
+      alert("Materi Berhasil!");
+      setJudulMateri(''); setMkMateri(''); setFile(null);
+      fetchData();
+    }
   };
 
   const deleteData = async (id: string, table: string) => {
@@ -122,8 +178,9 @@ export default function SuperAdminPage() {
   };
 
   const downloadPDF = (data: any) => {
-    if (data.file_pdf_url) { window.open(data.file_pdf_url, '_blank'); }
-    else {
+    if (data.file_pdf_url) { 
+      window.open(data.file_pdf_url, '_blank'); 
+    } else {
       const doc = new jsPDF();
       doc.text(`Surat Izin: ${data.nama_lengkap}`, 20, 20);
       doc.save(`Izin_${data.nama_lengkap}.pdf`);
@@ -132,7 +189,12 @@ export default function SuperAdminPage() {
 
   const toggleAbsensi = async (status: boolean) => {
     const { error } = await supabase.from('status_sistem').update({ is_active: status }).eq('id', 'absensi');
-    if (!error) setAbsensiEnabled(status);
+    if (!error) {
+      setAbsensiEnabled(status);
+      const msg = status ? "Pintu absensi sekarang DIBUKA. Segera absen!" : "Pintu absensi sudah DITUTUP.";
+      await sendNotification(status ? "✅ Absensi Dibuka" : "❌ Absensi Ditutup", msg, "absensi");
+      fetchData();
+    }
   };
 
   const updateKodeAbsen = async () => {
@@ -141,30 +203,44 @@ export default function SuperAdminPage() {
       .update({ kode_akses: kodeAbsen.toUpperCase() })
       .eq('id', 'absensi');
     
-    if (!error) alert("Kode Absen Berhasil Diperbarui: " + kodeAbsen.toUpperCase());
-    else alert("Gagal Update Kode!");
+    if (!error) {
+      alert("Kode Absen Berhasil Diperbarui: " + kodeAbsen.toUpperCase());
+    } else {
+      alert("Gagal Update Kode!");
+    }
   };
 
+  // --- RENDER LOGIN ---
   if (role === 'GUEST') return (
     <div className="flex h-screen items-center justify-center bg-slate-50">
       <form onSubmit={handleLogin} className="p-8 bg-white shadow-xl rounded-3xl border-t-8 border-[#800020] w-full max-w-sm text-center">
         <h2 className="text-xl font-black text-[#800020] mb-6 uppercase">Login Admin</h2>
-        <input type="password" placeholder="Password Admin" className="w-full p-4 border-2 rounded-2xl mb-4 text-center font-bold" onChange={e => setPassword(e.target.value)} />
+        <input 
+          type="password" 
+          placeholder="Password Admin" 
+          className="w-full p-4 border-2 rounded-2xl mb-4 text-center font-bold" 
+          onChange={e => setPassword(e.target.value)} 
+        />
         <button className="w-full bg-[#800020] text-white py-4 rounded-2xl font-black uppercase">Masuk</button>
       </form>
     </div>
   );
 
+  // --- RENDER DASHBOARD ---
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 bg-slate-50 min-h-screen font-sans text-slate-800">
       <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-        <h1 className="text-xl font-black text-[#800020] uppercase">{role === 'WEB' ? 'Admin Manajemen Konten' : 'Admin Absensi'}</h1>
+        <h1 className="text-xl font-black text-[#800020] uppercase">
+          {role === 'WEB' ? 'Admin Manajemen Konten' : 'Admin Absensi'}
+        </h1>
         <button onClick={() => setRole('GUEST')} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-black text-xs">LOGOUT</button>
       </div>
 
       {role === 'WEB' ? (
         <div className="space-y-10">
+          {/* Form Inputs */}
           <div className="grid md:grid-cols-3 gap-6">
+            {/* Tugas Kuliah */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#004d40]">
               <h2 className="font-black mb-4 text-[#004d40] uppercase text-xs">1. Post Tugas Kuliah</h2>
               <input type="text" placeholder="Matkul" className="w-full border p-3 mb-2 rounded-xl text-xs" value={mkKuliah} onChange={e => setMkKuliah(e.target.value)} />
@@ -172,9 +248,10 @@ export default function SuperAdminPage() {
               <input type="datetime-local" className="w-full border p-3 mb-2 rounded-xl text-xs" value={deadlineKuliah} onChange={e => setDeadlineKuliah(e.target.value)} />
               <input type="text" placeholder="Link Pengumpulan" className="w-full border p-3 mb-2 rounded-xl text-xs bg-blue-50" value={linkKuliah} onChange={e => setLinkKuliah(e.target.value)} />
               <textarea placeholder="Deskripsi..." className="w-full border p-3 mb-4 rounded-xl text-xs min-h-[80px]" value={deskripsiKuliah} onChange={e => setDeskripsiKuliah(e.target.value)} />
-              <button onClick={handlePostTugasKuliah} className="w-full bg-[#004d40] text-white py-3 rounded-xl font-black text-xs">PUBLISH</button>
+              <button onClick={handlePostTugasKuliah} className="w-full bg-[#004d40] text-white py-3 rounded-xl font-black text-xs shadow-md">PUBLISH</button>
             </div>
 
+            {/* Tugas Praktikum */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#D4AF37]">
               <h2 className="font-black mb-4 text-[#800020] uppercase text-xs">2. Post Praktikum</h2>
               <select className="w-full border p-3 mb-2 rounded-xl text-xs font-bold" value={mkPrak} onChange={e => {setMkPrak(e.target.value); setGolongan(e.target.value === 'DIT' ? 'B1' : 'C1');}}>
@@ -185,37 +262,37 @@ export default function SuperAdminPage() {
               </select>
               <input type="text" placeholder="Judul" className="w-full border p-3 mb-2 rounded-xl text-xs" value={judulPrak} onChange={e => setJudulPrak(e.target.value)} />
               <input type="datetime-local" className="w-full border p-3 mb-4 rounded-xl text-xs" value={deadlinePrak} onChange={e => setDeadlinePrak(e.target.value)} />
-              <button onClick={handlePostTugasPrak} className="w-full bg-[#D4AF37] text-white py-3 rounded-xl font-black text-xs">PUBLISH</button>
+              <button onClick={handlePostTugasPrak} className="w-full bg-[#D4AF37] text-white py-3 rounded-xl font-black text-xs shadow-md">PUBLISH</button>
             </div>
 
+            {/* Upload Materi */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#800020]">
               <h2 className="font-black mb-4 text-slate-700 uppercase text-xs">3. Upload Materi</h2>
-              <input type="text" placeholder="Matkul" className="w-full border p-3 mb-2 rounded-xl text-xs" onChange={e => setMkMateri(e.target.value)} />
-              <input type="text" placeholder="Judul Materi" className="w-full border p-3 mb-2 rounded-xl text-xs" onChange={e => setJudulMateri(e.target.value)} />
+              <input type="text" placeholder="Matkul" className="w-full border p-3 mb-2 rounded-xl text-xs" value={mkMateri} onChange={e => setMkMateri(e.target.value)} />
+              <input type="text" placeholder="Judul Materi" className="w-full border p-3 mb-2 rounded-xl text-xs" value={judulMateri} onChange={e => setJudulMateri(e.target.value)} />
               <input type="file" className="w-full mb-4 text-[10px]" onChange={e => setFile(e.target.files?.[0] || null)} />
-              <button onClick={handleUploadMateri} className="w-full bg-[#800020] text-white py-3 rounded-xl font-black text-xs">UPLOAD</button>
+              <button onClick={handleUploadMateri} className="w-full bg-[#800020] text-white py-3 rounded-xl font-black text-xs shadow-md">UPLOAD</button>
             </div>
           </div>
 
+          {/* List Data */}
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
               <h3 className="font-black text-xs uppercase mb-4 text-slate-400">Daftar Tugas Aktif</h3>
               <div className="space-y-4">
-                {/* Section Tugas Kuliah */}
                 <div>
                   <p className="text-[9px] font-black text-blue-600 mb-2 uppercase">Perkuliahan</p>
                   {tugasKuliah.map(t => (
-                    <div key={t.id} className="flex justify-between items-center p-3 mb-2 bg-slate-50 rounded-xl">
+                    <div key={t.id} className="flex justify-between items-center p-3 mb-2 bg-slate-50 rounded-xl border border-slate-100">
                       <span className="text-[10px] font-bold uppercase">{t.mk_nama}: {t.judul_tugas}</span>
                       <button onClick={() => deleteData(t.id, 'tugas_perkuliahan')} className="text-red-500 text-[9px] font-black hover:underline">HAPUS</button>
                     </div>
                   ))}
                 </div>
-                {/* Section Tugas Praktikum */}
                 <div>
                   <p className="text-[9px] font-black text-orange-600 mb-2 uppercase">Praktikum (Auto-Hide H+3)</p>
                   {tugasPrak.map(t => (
-                    <div key={t.id} className="flex justify-between items-center p-3 mb-2 bg-slate-50 rounded-xl">
+                    <div key={t.id} className="flex justify-between items-center p-3 mb-2 bg-slate-50 rounded-xl border border-slate-100">
                       <span className="text-[10px] font-bold uppercase">{t.mk_nama} ({t.golongan}): {t.judul_tugas}</span>
                       <button onClick={() => deleteData(t.id, 'tugas_praktikum')} className="text-red-500 text-[9px] font-black hover:underline">HAPUS</button>
                     </div>
@@ -227,11 +304,11 @@ export default function SuperAdminPage() {
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
               <h3 className="font-black text-xs uppercase mb-4 text-slate-400">Surat Izin Mahasiswa</h3>
               {izins.map(i => (
-                <div key={i.id} className="flex justify-between items-center p-2 mb-1 bg-slate-50 rounded-lg">
+                <div key={i.id} className="flex justify-between items-center p-3 mb-1 bg-slate-50 rounded-xl border border-slate-100">
                   <span className="text-[10px] font-bold uppercase">{i.nama_lengkap}</span>
                   <div className="flex gap-3">
-                    <button onClick={() => downloadPDF(i)} className="text-[#800020] text-[10px] font-black">PDF</button>
-                    <button onClick={() => deleteData(i.id, 'perizinan')} className="text-red-500 text-[10px] font-black">X</button>
+                    <button onClick={() => downloadPDF(i)} className="text-[#800020] text-[10px] font-black hover:underline">PDF</button>
+                    <button onClick={() => deleteData(i.id, 'perizinan')} className="text-red-500 text-[10px] font-black hover:underline">X</button>
                   </div>
                 </div>
               ))}
@@ -239,11 +316,15 @@ export default function SuperAdminPage() {
           </div>
         </div>
       ) : (
+        /* UI ABSENSI */
         <div className="space-y-6">
           <div className="grid md:grid-cols-2 gap-6">
              <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-blue-600">
                 <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Pintu Absensi</h2>
-                <button onClick={() => toggleAbsensi(!absensiEnabled)} className={`w-full py-4 rounded-2xl font-black text-sm transition-all shadow-lg ${absensiEnabled ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+                <button 
+                  onClick={() => toggleAbsensi(!absensiEnabled)} 
+                  className={`w-full py-4 rounded-2xl font-black text-sm transition-all shadow-lg ${absensiEnabled ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
+                >
                   {absensiEnabled ? 'SISTEM: OPEN' : 'SISTEM: CLOSED'}
                 </button>
              </div>
@@ -277,7 +358,7 @@ export default function SuperAdminPage() {
                 </thead>
                 <tbody>
                   {absensi.map((a, idx) => (
-                    <tr key={idx} className="border-b font-bold text-slate-700">
+                    <tr key={idx} className="border-b font-bold text-slate-700 hover:bg-slate-50 transition-colors">
                       <td className="py-3 uppercase">{a.nama_mahasiswa}</td>
                       <td className="py-3">{a.npm}</td>
                       <td className="py-3 text-slate-400">{new Date(a.waktu_absen).toLocaleString('id-ID')}</td>

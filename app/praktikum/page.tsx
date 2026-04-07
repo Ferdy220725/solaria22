@@ -29,37 +29,35 @@ export default function PraktikumPage() {
     fetchTugas();
   }, [activeTab]);
 
-  // Daftar golongan yang ditampilkan berdasarkan Mata Praktikum yang dipilih
   const getGolonganList = (mk: string) => {
     if (mk === 'DIT') return ['B1', 'B3', 'C3'];
     return ['C1', 'C2', 'C3'];
   };
 
   const renderGolongan = (golonganName: string) => {
-    // PERBAIKAN: Filter lebih kuat (Case Insensitive & Trim Spasi)
     const filtered = tugas.filter(t => 
       t.golongan && t.golongan.trim().toUpperCase() === golonganName.toUpperCase()
     );
     
     return (
-      <div key={golonganName} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-full hover:shadow-md transition-shadow">
-        <div className="flex justify-between items-center mb-4 border-b pb-2">
-          <h3 className="font-extrabold text-[#800020]">Golongan {golonganName}</h3>
-          <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-400 uppercase font-bold">{activeTab}</span>
+      <div key={golonganName} className="bg-white p-8 rounded-[35px] shadow-sm border-t-[8px] border-[#800020] flex flex-col h-full hover:shadow-md transition-all">
+        <div className="flex justify-between items-center mb-6 border-b border-slate-50 pb-4">
+          <h3 className="font-black text-xl text-[#800020] uppercase tracking-tighter">Golongan {golonganName}</h3>
+          <span className="text-[10px] bg-slate-100 px-3 py-1 rounded-full text-slate-400 uppercase font-black italic">{activeTab}</span>
         </div>
         
         <div className="space-y-4 flex-grow">
           {filtered.length > 0 ? (
             filtered.map(t => (
-              <div key={t.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-[#D4AF37] transition-all group">
-                <p className="font-bold text-slate-800 text-sm mb-1 group-hover:text-[#800020] transition-colors">
+              <div key={t.id} className="p-5 bg-slate-50 rounded-[25px] border border-slate-100 hover:border-[#D4AF37] transition-all group">
+                <p className="font-black text-slate-800 text-sm mb-2 group-hover:text-[#800020] transition-colors uppercase leading-tight">
                   {t.judul_tugas}
                 </p>
-                <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
+                <p className="text-[11px] font-medium text-slate-500 mb-4 leading-relaxed">
                   {t.deskripsi || "Tidak ada deskripsi tugas."}
                 </p>
                 
-                <div className="flex items-center gap-2 text-red-600 font-bold text-[10px] mb-3 bg-red-50 p-1.5 rounded-lg w-fit">
+                <div className="flex items-center gap-2 text-red-600 font-black text-[10px] mb-4 bg-red-50 p-2 rounded-xl w-fit uppercase tracking-tighter">
                   <span>⏰ Deadline:</span>
                   <span>
                     {new Date(t.deadline).toLocaleString('id-ID', { 
@@ -74,21 +72,21 @@ export default function PraktikumPage() {
                     href={t.link_pengumpulan} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="block text-center bg-[#D4AF37] text-white py-2 rounded-lg text-[10px] font-bold hover:bg-[#b8952e] shadow-sm active:scale-95 transition-all"
+                    className="block text-center bg-[#D4AF37] text-white py-3 rounded-2xl text-[10px] font-black uppercase hover:bg-black shadow-sm active:scale-95 transition-all tracking-widest"
                   >
-                    Link Pengumpulan Tugas →
+                    Kumpulkan Tugas →
                   </a>
                 ) : (
-                  <div className="text-center text-[9px] text-slate-400 italic py-2 border border-dashed rounded-lg">
-                    Link belum tersedia
+                  <div className="text-center text-[10px] font-black text-slate-400 uppercase py-3 border-2 border-dashed border-slate-200 rounded-2xl italic">
+                    Link Belum Tersedia
                   </div>
                 )}
               </div>
             ))
           ) : (
-            <div className="flex flex-col items-center justify-center py-12 opacity-30">
-              <span className="text-3xl mb-2">☕</span>
-              <p className="text-[10px] font-bold italic">Belum ada tugas untuk golongan ini.</p>
+            <div className="flex flex-col items-center justify-center py-16 opacity-30">
+              <span className="text-5xl mb-3">☕</span>
+              <p className="text-[10px] font-black uppercase tracking-widest text-center leading-loose">Belum ada tugas<br/>untuk golongan ini.</p>
             </div>
           )}
         </div>
@@ -97,22 +95,23 @@ export default function PraktikumPage() {
   };
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto min-h-screen bg-slate-50/50">
-      <div className="mb-10 text-center md:text-left">
-        <h1 className="text-3xl md:text-4xl font-black text-[#800020] mb-2 tracking-tight">Info Praktikum</h1>
-        <p className="text-slate-500 text-sm font-medium">Monitoring tugas praktikum Agroteknologi per-golongan secara real-time.</p>
+    // Memperbaiki background abu-abu kusam menjadi slate-50 yang bersih
+    <div className="min-h-screen bg-slate-50 p-6 md:p-12 font-sans text-slate-900">
+      <div className="max-w-7xl mx-auto mb-12">
+        <h1 className="text-5xl font-black text-[#800020] mb-2 uppercase tracking-tighter">Info Praktikum</h1>
+        <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] italic">Monitoring tugas praktikum per-golongan secara real-time.</p>
       </div>
       
       {/* Tab Navigation */}
-      <div className="flex gap-3 mb-10 overflow-x-auto pb-4 no-scrollbar justify-start md:justify-start">
+      <div className="max-w-7xl mx-auto flex gap-4 mb-12 overflow-x-auto pb-4 no-scrollbar">
         {praktikumList.map(mk => (
           <button 
             key={mk}
             onClick={() => setActiveTab(mk)}
-            className={`px-10 py-3 rounded-2xl font-black text-xs transition-all whitespace-nowrap border-2 ${
+            className={`px-12 py-4 rounded-[20px] font-black text-[11px] uppercase tracking-widest transition-all border-b-4 ${
               activeTab === mk 
-              ? 'bg-[#800020] text-white border-[#800020] shadow-xl shadow-red-900/20 -translate-y-1' 
-              : 'bg-white text-slate-400 border-white hover:border-slate-200 hover:text-slate-600 shadow-sm'
+              ? 'bg-[#800020] text-white border-red-900 shadow-xl shadow-red-900/10 -translate-y-1' 
+              : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200 hover:text-slate-600 shadow-sm'
             }`}
           >
             {mk}
@@ -121,19 +120,21 @@ export default function PraktikumPage() {
       </div>
 
       {/* Grid Content */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-32 space-y-4">
-          <div className="w-10 h-10 border-4 border-slate-200 border-t-[#800020] rounded-full animate-spin"></div>
-          <p className="text-slate-400 font-bold text-xs animate-pulse">Menghubungkan ke Database...</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
-          {getGolonganList(activeTab).map(gol => renderGolongan(gol))}
-        </div>
-      )}
+      <div className="max-w-7xl mx-auto">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-32 space-y-6">
+            <div className="w-12 h-12 border-[6px] border-slate-200 border-t-[#800020] rounded-full animate-spin"></div>
+            <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest animate-pulse">Menghubungkan ke Database...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {getGolonganList(activeTab).map(gol => renderGolongan(gol))}
+          </div>
+        )}
+      </div>
 
-      {/* Footer info kecil */}
-      <div className="mt-16 text-center text-slate-400 text-[10px] font-medium uppercase tracking-widest">
+      {/* Footer */}
+      <div className="max-w-7xl mx-auto mt-24 pb-10 text-center text-slate-300 text-[10px] font-black uppercase tracking-[0.3em]">
         &copy; 2026 AgrotekC Class Management System
       </div>
     </div>

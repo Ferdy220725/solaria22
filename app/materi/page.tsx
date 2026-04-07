@@ -2,7 +2,46 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
 
+// --- KOMPONEN INTERAKTIF (3D EFFECT) ---
+function InteractiveCard({ children }: { children: React.ReactNode }) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  // Membuat gerakan lebih smooth seperti pegas
+  const mouseXSpring = useSpring(x);
+  const mouseYSpring = useSpring(y);
+
+  const rotateX = useTransform(mouseYSpring, [-100, 100], [10, -10]);
+  const rotateY = useTransform(mouseXSpring, [-100, 100], [-10, 10]);
+
+  function handleMouseMove(event: React.MouseEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    x.set(event.clientX - centerX);
+    y.set(event.clientY - centerY);
+  }
+
+  function handleMouseLeave() {
+    x.set(0);
+    y.set(0);
+  }
+
+  return (
+    <motion.div
+      style={{ perspective: 1000, rotateX, rotateY }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className="w-full h-full"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// --- HALAMAN UTAMA MATERI ---
 interface Materi {
   id: string;
   judul: string;
@@ -13,12 +52,9 @@ interface Materi {
 export default function MateriPage() {
   const [materiList, setMateriList] = useState<Materi[]>([]);
   const [filter, setFilter] = useState('Semua');
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [hasilRangkum, setHasilRangkum] = useState<Record<string, string>>({});
   
   const supabase = createClient();
 
-  // Load data materi dari Supabase saat mounting
   useEffect(() => {
     async function fetchData() {
       const { data, error } = await supabase
@@ -35,50 +71,22 @@ export default function MateriPage() {
     fetchData();
   }, [supabase]);
 
-  const handleRangkumAI = async (id: string, fileUrl: string) => {
-    setProcessingId(id);
-    try {
-      // 1. Ambil file PDF dari URL Supabase Storage
-      const fileRes = await fetch(fileUrl);
-      if (!fileRes.ok) throw new Error("Gagal mengunduh file PDF dari storage.");
-      const blob = await fileRes.blob();
-
-      // 2. Siapkan data untuk dikirim ke API internal kita
-      const formData = new FormData();
-      formData.append("file", blob, "materi.pdf");
-
-      // 3. Panggil API Route Route (/api/ai-helper)
-      const res = await fetch("/api/ai-helper", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Gagal memproses AI");
-
-      // 4. Update state dengan hasil rangkuman
-      setHasilRangkum(prev => ({ ...prev, [id]: result.text }));
-
-    } catch (err: any) {
-      console.error("Error UI:", err.message);
-      alert("Gagal merangkum: " + err.message);
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
   const daftarMK = Array.from(new Set(materiList.map(m => m.mk_nama)));
   const filteredMateri = filter === 'Semua' ? materiList : materiList.filter(m => m.mk_nama === filter);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto min-h-screen bg-white">
+    <div className="p-8 max-w-7xl mx-auto min-h-screen bg-[#f8f9fa] pb-32">
       {/* Header & Filter */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
-        <h1 className="text-3xl font-black text-[#800020] uppercase italic tracking-tighter">
-          Materi Kuliah
-        </h1>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-6">
+        <div>
+          <h1 className="text-4xl font-black text-[#800020] uppercase italic tracking-tighter">
+            Materi Kuliah
+          </h1>
+          <p className="text-gray-400 font-medium text-sm mt-1">Eksplorasi bahan ajar Agroteknologi</p>
+        </div>
+        
         <select 
-          className="border-2 border-gray-200 p-2 rounded-xl font-bold text-sm focus:border-[#800020] outline-none transition-all"
+          className="bg-white border-none shadow-[5px_5px_15px_#d1d1d1,-5px_-5px_15px_#ffffff] p-4 rounded-2xl font-bold text-xs uppercase tracking-widest text-[#800020] outline-none cursor-pointer hover:scale-105 transition-transform"
           onChange={(e) => setFilter(e.target.value)}
         >
           <option value="Semua">Semua Mata Kuliah</option>
@@ -86,54 +94,39 @@ export default function MateriPage() {
         </select>
       </div>
 
-      {/* Grid Materi */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      {/* Grid Materi dengan Efek Timbul & Interaktif */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
         {filteredMateri.map((m) => (
-          <div key={m.id} className="border-2 border-gray-100 p-6 rounded-[32px] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between bg-gray-50/30">
-            <div>
-              <span className="text-[10px] font-bold text-[#800020] uppercase bg-red-50 px-3 py-1 rounded-full border border-red-100">
-                {m.mk_nama}
-              </span>
-              <h2 className="text-xl font-bold mt-3 mb-4 uppercase leading-tight text-gray-800">
-                {m.judul}
-              </h2>
-              
-              {/* Box Hasil Rangkuman AI */}
-              {hasilRangkum[m.id] && (
-                <div className="mt-4 p-4 bg-yellow-50 rounded-2xl border border-yellow-200 text-sm whitespace-pre-wrap leading-relaxed animate-in fade-in duration-500">
-                  <strong className="block mb-2 text-yellow-800">✨ Rangkuman Materi:</strong>
-                  <div className="text-gray-700 italic">
-                    {hasilRangkum[m.id]}
-                  </div>
-                </div>
-              )}
-            </div>
+          <InteractiveCard key={m.id}>
+            <div className="bg-[#f8f9fa] p-8 rounded-[40px] flex flex-col justify-between h-full border border-white/50 shadow-[20px_20px_40px_#d1d1d1,-20px_-20px_40px_#ffffff] transition-colors hover:bg-white group">
+              <div>
+                <span className="text-[10px] font-black text-[#800020] uppercase bg-red-50 px-4 py-2 rounded-full border border-red-100 tracking-[0.2em]">
+                  {m.mk_nama}
+                </span>
+                <h2 className="text-2xl font-black mt-6 mb-4 uppercase leading-[1.1] text-gray-800 tracking-tighter group-hover:text-black transition-colors">
+                  {m.judul}
+                </h2>
+              </div>
 
-            {/* Action Buttons */}
-            <div className="mt-8 space-y-3">
-              <a 
-                href={m.file_url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="block text-center py-2.5 bg-white border border-gray-200 rounded-xl font-bold text-[11px] tracking-widest hover:bg-gray-100 transition"
-              >
-                LIHAT PDF LENGKAP
-              </a>
-              <button 
-                onClick={() => handleRangkumAI(m.id, m.file_url)}
-                disabled={processingId !== null}
-                className="w-full bg-[#800020] text-white py-4 rounded-xl font-bold text-[11px] tracking-widest disabled:bg-gray-300 hover:opacity-90 transition shadow-lg shadow-red-900/10"
-              >
-                {processingId === m.id ? "SEDANG MERANGKUM..." : "RANGKUM DENGAN AI"}
-              </button>
+              {/* Action Button Timbul */}
+              <div className="mt-10">
+                <a 
+                  href={m.file_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="block w-full text-center py-5 bg-[#800020] text-white rounded-[20px] font-black text-[11px] tracking-[0.2em] uppercase shadow-[5px_10px_20px_rgba(128,0,32,0.2)] hover:shadow-[5px_15px_30px_rgba(128,0,32,0.4)] hover:bg-black transition-all active:scale-95"
+                >
+                  Lihat Materi
+                </a>
+              </div>
             </div>
-          </div>
+          </InteractiveCard>
         ))}
       </div>
 
       {filteredMateri.length === 0 && (
-        <div className="text-center py-20 text-gray-400 font-medium">
-          Belum ada materi untuk mata kuliah ini.
+        <div className="text-center py-20 text-gray-400 font-black uppercase tracking-widest opacity-50">
+          Kosong / Tidak ditemukan
         </div>
       )}
     </div>

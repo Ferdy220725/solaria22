@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Lottie from "lottie-react";
 import catAnimation from "../public/cat.json";
 
-// Definisikan Interface agar TypeScript tidak rewel
+// Interface untuk TypeScript
 interface Tugas {
   id: string;
   judul_tugas: string;
@@ -31,7 +31,7 @@ export default function Dashboard() {
   const supabase = createClient();
   const router = useRouter();
 
-  // LOGIKA WAKTU & KALENDER
+  // --- LOGIKA WAKTU & KALENDER ---
   const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
   const today = new Date();
   const tomorrow = new Date(today);
@@ -57,12 +57,56 @@ export default function Dashboard() {
     "Jumat": ["08.00 - 09.40: DPT"]
   };
 
+  // --- FUNGSI DAFTAR PUSH NOTIFICATION (LOGIKA UTAMA) ---
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const subscribeToPush = async () => {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      
+      // PUBLIC KEY MILIKMU SUDAH TERPASANG DI SINI
+      const publicKey = 'BMUls0yOcxb9iZuOls3Ko-n00ZiRXLX11_4LD3wv3Brbhj1LTmrsBHBineXervnU4Xkl3CCVIDDGhpb6SBqUNv4'; 
+      
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey)
+      });
+
+      console.log("--- ALAMAT NOTIF USER (TOKEN) ---");
+      console.log(JSON.stringify(subscription));
+      console.log("---------------------------------");
+      
+      // Langkah berikutnya nanti: simpan JSON ini ke tabel Supabase 'user_subscriptions'
+    } catch (error) {
+      console.error("Gagal ambil izin push:", error);
+    }
+  };
+
   useEffect(() => {
-    // 1. REGISTRASI SERVICE WORKER (Tambahan Baru)
+    // 1. REGISTRASI SERVICE WORKER OTOMATIS
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js')
-        .then((reg) => console.log('SW Berhasil Daftar dari Dashboard!', reg.scope))
+        .then((reg) => {
+          console.log('SW Berhasil Daftar!', reg.scope);
+          // 2. MINTA IZIN NOTIFIKASI
+          if (Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+              if (permission === 'granted') subscribeToPush();
+            });
+          } else if (Notification.permission === 'granted') {
+            subscribeToPush();
+          }
+        })
         .catch((err) => console.error('SW Gagal Daftar:', err));
     }
 
@@ -96,6 +140,7 @@ export default function Dashboard() {
     }
   };
 
+  // --- TAMPILAN AWAL (SAPAAN) ---
   if (!showDashboard) {
     return (
       <div className="relative h-screen w-full bg-[#f8f9fa] flex flex-col items-center justify-center overflow-hidden font-sans">
@@ -115,9 +160,9 @@ export default function Dashboard() {
     );
   }
 
+  // --- TAMPILAN DASHBOARD UTAMA ---
   return (
     <div className="p-8 max-w-7xl mx-auto min-h-screen bg-slate-50 font-sans">
-      {/* HEADER */}
       <div className="mb-10 flex flex-col md:flex-row justify-between items-center md:items-end gap-4">
         <div>
           <h1 className="text-4xl font-extrabold text-[#800020] uppercase tracking-tighter leading-none">Agrotek Dashboard</h1>
@@ -129,12 +174,12 @@ export default function Dashboard() {
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* SIDEBAR */}
+        {/* KOLOM KIRI: JADWAL & ABSENSI */}
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#800020]">
             <h2 className="text-xs font-black text-slate-800 uppercase mb-4 border-b pb-2 tracking-widest italic">Status Jadwal</h2>
             
-            {/* Notifikasi H-1 ETS/EAS */}
+            {/* Logika ETS/EAS */}
             {!isETS(todayStr) && !isEAS(todayStr) && (
               <>
                 {isETS(tomorrowStr) && (
@@ -150,7 +195,6 @@ export default function Dashboard() {
               </>
             )}
 
-            {/* Jadwal Hari Ini */}
             {isETS(todayStr) || isEAS(todayStr) ? (
               <div className="py-6 text-center bg-red-50 rounded-2xl border-2 border-red-100">
                 <span className="text-4xl block mb-2">📝</span>
@@ -176,7 +220,7 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* MAIN AREA */}
+        {/* KOLOM TENGAH & KANAN: TUGAS & BEASISWA */}
         <div className="lg:col-span-2 space-y-8">
           <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#004d40]">
             <h2 className="text-xs font-black text-slate-800 uppercase mb-6 border-b pb-2 tracking-widest">Informasi Tugas</h2>
@@ -210,7 +254,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* BEASISWA CONTAINER */}
+          {/* SECTION BEASISWA */}
           <div className="bg-white rounded-3xl shadow-sm border-t-8 border-orange-500 overflow-hidden">
             <button 
               onClick={() => setShowScholarships(!showScholarships)}
@@ -244,7 +288,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* MODAL DETAIL TUGAS */}
       {selectedTugas && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[40px] overflow-hidden shadow-2xl border-b-[12px] border-[#004d40]">

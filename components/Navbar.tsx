@@ -7,22 +7,23 @@ import { useEffect, useState } from "react";
 export default function Navbar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const [isWelcomePage, setIsWelcomePage] = useState(true);
+  const [shouldShow, setShouldShow] = useState(false);
 
   useEffect(() => {
-    const checkView = () => {
-      // Cek apakah masih di halaman awal (yang ada tombol Masuk Dashboard)
-      const welcomeElement = document.querySelector('button')?.textContent?.includes("Masuk Dashboard");
-      setIsWelcomePage(!!welcomeElement);
+    const checkVisibility = () => {
+      const isWelcomePage = !!document.querySelector('button')?.textContent?.includes("Masuk Dashboard");
+      if (pathname !== "/") {
+        setShouldShow(true);
+      } else {
+        setShouldShow(!isWelcomePage);
+      }
     };
-    
-    checkView();
-    window.addEventListener('click', checkView);
-    return () => window.removeEventListener('click', checkView);
-  }, []);
+    checkVisibility();
+    window.addEventListener('click', checkVisibility);
+    return () => window.removeEventListener('click', checkVisibility);
+  }, [pathname]);
 
-  // Navbar sembunyi di halaman kucing
-  if (isWelcomePage && pathname === "/") return null;
+  if (!shouldShow) return null;
 
   const menuItems = [
     { id: "m1", name: "Home", href: "/", icon: <LayoutDashboard size={20} /> },
@@ -33,36 +34,42 @@ export default function Navbar() {
   ];
 
   return (
-    <div className="fixed bottom-8 right-8 z-[999] flex flex-col items-end gap-4">
-      {/* Menu Items dengan Teks */}
-      <div className={`flex flex-col gap-3 transition-all duration-500 transform ${
-        isOpen ? "scale-100 opacity-100 translate-y-0" : "scale-0 opacity-0 translate-y-10 pointer-events-none"
+    // PENTING: pointer-events-none supaya container ini tidak memblokir klik ke materi/konten di belakangnya
+    <div className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[9999] flex flex-col items-end gap-3 pointer-events-none">
+      
+      {/* Menu List */}
+      <div className={`flex flex-col gap-2 mb-2 transition-all duration-300 transform origin-bottom ${
+        isOpen ? "scale-100 opacity-100 translate-y-0 pointer-events-auto" : "scale-0 opacity-0 translate-y-10 pointer-events-none"
       }`}>
         {menuItems.map((item) => (
           <Link
             key={item.id}
             href={item.href}
             onClick={() => setIsOpen(false)}
-            className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl backdrop-blur-md transition-all hover:scale-105 ${
+            // pointer-events-auto supaya tombolnya BISA diklik saat muncul
+            className={`flex items-center justify-end gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border pointer-events-auto ${
               pathname === item.href 
-                ? "bg-[#800020] text-white" 
-                : "bg-white/95 text-slate-600 border border-slate-100"
+                ? "bg-[#800020] text-white border-[#800020]" 
+                : "bg-white/95 text-slate-600 border-slate-100"
             }`}
           >
             <span className="text-[10px] font-black uppercase tracking-widest">{item.name}</span>
-            {item.icon}
+            <div className="bg-slate-50/50 p-1 rounded-lg text-inherit">
+                {item.icon}
+            </div>
           </Link>
         ))}
       </div>
 
-      {/* Tombol Utama Tanpa Label "Solaria Menu" */}
+      {/* Tombol Utama */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-16 h-16 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.2)] flex items-center justify-center transition-all duration-300 ${
-          isOpen ? "bg-slate-800 rotate-90" : "bg-[#800020] hover:scale-110 active:scale-95"
+        // pointer-events-auto supaya tombol bunder ini BISA diklik
+        className={`w-14 h-14 md:w-16 md:h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 pointer-events-auto active:scale-90 ${
+          isOpen ? "bg-slate-800 rotate-90" : "bg-[#800020] hover:scale-110"
         }`}
       >
-        {isOpen ? <X color="white" size={28} /> : <Menu color="white" size={28} />}
+        {isOpen ? <X color="white" size={26} /> : <Menu color="white" size={26} />}
       </button>
     </div>
   );

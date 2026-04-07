@@ -58,6 +58,14 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    // 1. REGISTRASI SERVICE WORKER (Tambahan Baru)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((reg) => console.log('SW Berhasil Daftar dari Dashboard!', reg.scope))
+        .catch((err) => console.error('SW Gagal Daftar:', err));
+    }
+
     const fetchData = async () => {
       const { data: dataTugas } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
       if (dataTugas) setTugas(dataTugas as Tugas[]);
@@ -202,7 +210,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* BEASISWA CONTAINER (REVISI FOLDER) */}
+          {/* BEASISWA CONTAINER */}
           <div className="bg-white rounded-3xl shadow-sm border-t-8 border-orange-500 overflow-hidden">
             <button 
               onClick={() => setShowScholarships(!showScholarships)}

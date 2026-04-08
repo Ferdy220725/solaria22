@@ -72,7 +72,6 @@ export default function AbsensiMahasiswa() {
   }, []);
 
   const checkStatus = async () => {
-    // Mengambil status AKTIF dan KODE AKSES terbaru dari tabel status_sistem
     const { data } = await supabase
       .from('status_sistem')
       .select('is_active, kode_akses')
@@ -118,7 +117,6 @@ export default function AbsensiMahasiswa() {
       const wibTime = new Date(now.getTime() + wibOffset);
       const today = wibTime.toISOString().split('T')[0];
 
-      // Cek apakah sudah absen hari ini
       const { data: existing } = await supabase
         .from('absensi')
         .select('id')
@@ -133,7 +131,6 @@ export default function AbsensiMahasiswa() {
         return;
       }
 
-      // Simpan data absen
       const { error } = await supabase
         .from('absensi')
         .insert([{
@@ -157,7 +154,7 @@ export default function AbsensiMahasiswa() {
   if (loading) return <div className="flex h-screen items-center justify-center font-bold text-slate-400 uppercase tracking-widest">LOADING...</div>;
 
   if (!isOpen) return (
-    <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
+    <div className="flex h-screen items-center justify-center bg-slate-50 p-6 text-slate-900">
       <div className="text-center bg-white p-10 rounded-[40px] shadow-xl border-t-[10px] border-red-600 max-w-md w-full">
         <h1 className="text-3xl font-black text-red-600 mb-4 uppercase">ABSEN CLOSED</h1>
         <p className="font-bold text-slate-500 uppercase text-xs">Sistem sedang ditutup oleh Admin.</p>
@@ -166,7 +163,7 @@ export default function AbsensiMahasiswa() {
   );
 
   if (isSuccess) return (
-    <div className="flex h-screen items-center justify-center bg-green-50 p-6">
+    <div className="flex h-screen items-center justify-center bg-green-50 p-6 text-slate-900">
       <div className="text-center bg-white p-10 rounded-[40px] shadow-2xl border-t-[10px] border-green-600 max-w-md w-full">
         <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
@@ -178,7 +175,7 @@ export default function AbsensiMahasiswa() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-slate-900">
       
       {/* TAMPILAN 1: INPUT KODE (GERBANG AWAL) */}
       {!isVerified ? (
@@ -195,7 +192,8 @@ export default function AbsensiMahasiswa() {
               placeholder="KODE DISINI"
               value={inputKode}
               onChange={(e) => setInputKode(e.target.value)}
-              className="w-full p-5 bg-slate-50 border-2 border-slate-100 focus:border-[#800020] rounded-2xl outline-none font-black text-center uppercase tracking-widest transition-all"
+              // FIX: text-slate-900 memastikan teks input tetap hitam
+              className="w-full p-5 bg-slate-50 border-2 border-slate-100 focus:border-[#800020] rounded-2xl outline-none font-black text-center uppercase tracking-widest transition-all text-slate-900"
             />
             <button 
               onClick={handleVerifikasiKode}
@@ -220,7 +218,8 @@ export default function AbsensiMahasiswa() {
                 <select 
                   value={selectedStudent}
                   onChange={(e) => setSelectedStudent(e.target.value)}
-                  className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-[#800020] rounded-2xl outline-none font-bold appearance-none cursor-pointer transition-all"
+                  // FIX: text-slate-900 memastikan nama mahasiswa tetap hitam
+                  className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-[#800020] rounded-2xl outline-none font-bold appearance-none cursor-pointer transition-all text-slate-900"
                 >
                   <option value="">-- KLIK UNTUK MEMILIH NAMA --</option>
                   {DAFTAR_MAHASISWA.map((m) => (
@@ -235,14 +234,16 @@ export default function AbsensiMahasiswa() {
                   <input 
                     type="text" 
                     placeholder="MASUKKAN NAMA LENGKAP"
-                    className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold uppercase"
+                    // FIX: text-slate-900
+                    className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold uppercase text-slate-900"
                     value={namaManual}
                     onChange={(e) => setNamaManual(e.target.value)}
                   />
                   <input 
                     type="number" 
                     placeholder="MASUKKAN NPM"
-                    className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold"
+                    // FIX: text-slate-900
+                    className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold text-slate-900"
                     value={npmManual}
                     onChange={(e) => setNpmManual(e.target.value)}
                   />

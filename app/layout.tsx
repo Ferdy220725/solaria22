@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from 'sonner';
 import Navbar from "@/components/Navbar";
 import ThemeEngine from "@/components/ThemeEngine";
+import ChatBot from "@/components/ChatBot"; // Impor fitur Solaria Copilot
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,9 @@ export default function RootLayout({
         </main>
 
         <Toaster position="top-center" richColors theme="system" />
+        
+        {/* Fitur Asisten AI Solaria Copilot */}
+        <ChatBot />
       </body>
     </html>
   );

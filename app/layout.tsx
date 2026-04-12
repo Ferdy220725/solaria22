@@ -16,9 +16,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// --- METADATA TERBARU UNTUK SEO GOOGLE ---
 export const metadata: Metadata = {
-  title: "Solaria - Manajemen Agroteknologi",
-  description: "Aplikasi Manajemen Kelas C Agroteknologi UPN",
+  title: "Solaria - Manajemen Agroteknologi C",
+  description: "Pusat informasi dan manajemen akademik mahasiswa Agroteknologi C. Dimana Bumi dan Ilmu Pengetahuan Bersatu.",
+  keywords: ["Agroteknologi", "UPN", "Manajemen Kelas", "Solaria", "Pertanian"],
 };
 
 export default function RootLayout({
@@ -31,6 +33,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased transition-colors duration-700 bg-white dark:bg-[#0a0a0a] text-slate-900 dark:text-white`}
       >
+        {/* Komponen Inti Solaria */}
         <ThemeEngine />
         <Navbar />
 
@@ -40,7 +43,7 @@ export default function RootLayout({
 
         <Toaster position="top-center" richColors theme="system" />
         
-        {/* Fitur Asisten AI Solaria Copilot */}
+        {/* Fitur Asisten AI Solaria Copilot (Zora) */}
         <ChatBot />
       </body>
     </html>

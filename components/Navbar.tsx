@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, FlaskConical, FileText, UserCog, Menu, X } from "lucide-react";
+import { LayoutDashboard, BookOpen, FlaskConical, FileText, UserCog, Menu, X, Sparkles } from "lucide-react"; // Tambah Sparkles
 import { useEffect, useState } from "react";
 
 export default function Navbar() {
@@ -31,10 +31,11 @@ export default function Navbar() {
     { id: "m3", name: "Praktikum", href: "/praktikum", icon: <FlaskConical size={20} /> },
     { id: "m4", name: "Izin", href: "/perizinan", icon: <FileText size={20} /> },
     { id: "m5", name: "Admin", href: "/admin", icon: <UserCog size={20} /> },
+    // Tambahkan Menu AI di sini
+    { id: "m6", name: "Zora AI", href: "#", icon: <Sparkles size={20} />, isAi: true },
   ];
 
   return (
-    // PENTING: pointer-events-none supaya container ini tidak memblokir klik ke materi/konten di belakangnya
     <div className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[9999] flex flex-col items-end gap-3 pointer-events-none">
       
       {/* Menu List */}
@@ -42,29 +43,44 @@ export default function Navbar() {
         isOpen ? "scale-100 opacity-100 translate-y-0 pointer-events-auto" : "scale-0 opacity-0 translate-y-10 pointer-events-none"
       }`}>
         {menuItems.map((item) => (
-          <Link
-            key={item.id}
-            href={item.href}
-            onClick={() => setIsOpen(false)}
-            // pointer-events-auto supaya tombolnya BISA diklik saat muncul
-            className={`flex items-center justify-end gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border pointer-events-auto ${
-              pathname === item.href 
-                ? "bg-[#800020] text-white border-[#800020]" 
-                : "bg-white/95 text-slate-600 border-slate-100"
-            }`}
-          >
-            <span className="text-[10px] font-black uppercase tracking-widest">{item.name}</span>
-            <div className="bg-slate-50/50 p-1 rounded-lg text-inherit">
-                {item.icon}
-            </div>
-          </Link>
+          item.isAi ? (
+            // Khusus tombol AI, kita pakai button, bukan Link
+            <button
+              key={item.id}
+              onClick={() => {
+                setIsOpen(false);
+                window.dispatchEvent(new Event('open-zora')); // Colek ChatBot
+              }}
+              className="flex items-center justify-end gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border pointer-events-auto bg-white/95 dark:bg-[#1a1a1a]/90 text-[#800020] dark:text-amber-400 border-slate-100 dark:border-white/10"
+            >
+              <span className="text-[10px] font-black uppercase tracking-widest">{item.name}</span>
+              <div className="bg-amber-50 dark:bg-amber-500/10 p-1 rounded-lg">
+                  {item.icon}
+              </div>
+            </button>
+          ) : (
+            <Link
+              key={item.id}
+              href={item.href}
+              onClick={() => setIsOpen(false)}
+              className={`flex items-center justify-end gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border pointer-events-auto ${
+                pathname === item.href 
+                  ? "bg-[#800020] text-white border-[#800020]" 
+                  : "bg-white/95 dark:bg-[#1a1a1a]/90 text-slate-600 dark:text-slate-300 border-slate-100 dark:border-white/10"
+              }`}
+            >
+              <span className="text-[10px] font-black uppercase tracking-widest">{item.name}</span>
+              <div className="bg-slate-50/50 dark:bg-white/5 p-1 rounded-lg text-inherit">
+                  {item.icon}
+              </div>
+            </Link>
+          )
         ))}
       </div>
 
       {/* Tombol Utama */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        // pointer-events-auto supaya tombol bunder ini BISA diklik
         className={`w-14 h-14 md:w-16 md:h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 pointer-events-auto active:scale-90 ${
           isOpen ? "bg-slate-800 rotate-90" : "bg-[#800020] hover:scale-110"
         }`}

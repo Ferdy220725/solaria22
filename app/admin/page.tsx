@@ -17,6 +17,11 @@ export default function SuperAdminPage() {
   const [absensiEnabled, setAbsensiEnabled] = useState(false);
   const [kodeAbsen, setKodeAbsen] = useState('');
 
+  // --- STATE BARU: ZOOM ---
+  const [zoomJudul, setZoomJudul] = useState('');
+  const [zoomLink, setZoomLink] = useState('');
+  const [zoomActive, setZoomActive] = useState(false);
+
   // --- STATE INPUT ---
   const [judulPrak, setJudulPrak] = useState('');
   const [mkPrak, setMkPrak] = useState('FISTAN'); 
@@ -48,6 +53,14 @@ export default function SuperAdminPage() {
       const { data: dPrak } = await supabase.from('tugas_praktikum').select('*').order('deadline', { ascending: true });
       const { data: dKuliah } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
       
+      // Ambil Data Zoom (Fitur Baru)
+      const { data: dZoom } = await supabase.from('zoom_meetings').select('*').limit(1).maybeSingle();
+      if (dZoom) {
+        setZoomJudul(dZoom.judul);
+        setZoomLink(dZoom.link);
+        setZoomActive(dZoom.is_active);
+      }
+
       if (dIzin) setIzins(dIzin);
       
       if (dPrak) {
@@ -103,7 +116,31 @@ export default function SuperAdminPage() {
     }
   };
 
-  // --- HANDLERS ---
+  // --- HANDLER ZOOM (BARU) ---
+  const handleUpdateZoom = async () => {
+    if (!zoomJudul || !zoomLink) return alert("Isi Judul & Link Zoom!");
+    
+    // Kita asumsikan id data zoom adalah 1 (sesuai SQL tadi)
+    // Jika belum ada data, Supabase akan meng-upsert
+    const { error } = await supabase.from('zoom_meetings').upsert({
+      id: 1, // Memastikan kita hanya mengupdate baris yang sama
+      judul: zoomJudul.trim(),
+      link: zoomLink.trim(),
+      is_active: zoomActive,
+    });
+
+    if (!error) {
+      if (zoomActive) {
+        await sendNotification("🎥 Live Zoom", `Klik untuk gabung: ${zoomJudul}`, "zoom");
+      }
+      alert("Informasi Zoom Berhasil Diperbarui!");
+      fetchData();
+    } else {
+      alert("Gagal update zoom: " + error.message);
+    }
+  };
+
+  // --- HANDLERS LAMA ---
   const handlePostTugasKuliah = async () => {
     if(!judulKuliah || !deadlineKuliah) return alert("Isi Judul & Deadline!");
     
@@ -238,7 +275,34 @@ export default function SuperAdminPage() {
 
       {role === 'WEB' ? (
         <div className="space-y-10">
-          {/* Form Inputs */}
+          
+          {/* BARU: MANAJEMEN ZOOM (Diletakkan paling atas agar mudah dikontrol) */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-[35px] shadow-lg text-white border-b-8 border-blue-900">
+            <h2 className="font-black mb-4 uppercase text-xs flex items-center gap-2">
+              <span>🎥</span> KONTROL ZOOM MEETING (LIVE)
+            </h2>
+            <div className="grid md:grid-cols-4 gap-4 items-end">
+               <div className="md:col-span-1">
+                  <p className="text-[9px] font-black uppercase mb-1 opacity-70">Judul Mata Kuliah</p>
+                  <input type="text" placeholder="Contoh: Genetik Tanaman" className="w-full p-3 rounded-xl text-xs text-slate-900 font-bold" value={zoomJudul} onChange={e => setZoomJudul(e.target.value)} />
+               </div>
+               <div className="md:col-span-1">
+                  <p className="text-[9px] font-black uppercase mb-1 opacity-70">Link Zoom</p>
+                  <input type="text" placeholder="https://zoom.us/..." className="w-full p-3 rounded-xl text-xs text-slate-900 font-bold" value={zoomLink} onChange={e => setZoomLink(e.target.value)} />
+               </div>
+               <div className="md:col-span-1">
+                  <p className="text-[9px] font-black uppercase mb-1 opacity-70">Status Tampil</p>
+                  <button onClick={() => setZoomActive(!zoomActive)} className={`w-full py-3 rounded-xl text-xs font-black uppercase transition-all ${zoomActive ? 'bg-green-400 text-green-950' : 'bg-slate-400 text-slate-700'}`}>
+                    {zoomActive ? 'AKTIF (MUNCUL)' : 'NON-AKTIF (HIDDEN)'}
+                  </button>
+               </div>
+               <div className="md:col-span-1">
+                  <button onClick={handleUpdateZoom} className="w-full bg-white text-blue-700 py-3 rounded-xl font-black text-xs shadow-xl active:scale-95 transition-all">SIMPAN PERUBAHAN</button>
+               </div>
+            </div>
+          </div>
+
+          {/* Form Inputs Lama */}
           <div className="grid md:grid-cols-3 gap-6">
             {/* Tugas Kuliah */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#004d40]">
@@ -275,7 +339,7 @@ export default function SuperAdminPage() {
             </div>
           </div>
 
-          {/* List Data */}
+          {/* List Data Lama */}
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
               <h3 className="font-black text-xs uppercase mb-4 text-slate-400">Daftar Tugas Aktif</h3>

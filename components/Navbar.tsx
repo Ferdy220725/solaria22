@@ -1,92 +1,83 @@
 "use client";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, FlaskConical, FileText, UserCog, Menu, X, Sparkles } from "lucide-react"; // Tambah Sparkles
+import { LayoutDashboard, BookOpen, FlaskConical, FileText, UserCog } from "lucide-react"; 
 import { useEffect, useState } from "react";
 
 export default function Navbar() {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
   const [shouldShow, setShouldShow] = useState(false);
 
   useEffect(() => {
     const checkVisibility = () => {
-      const isWelcomePage = !!document.querySelector('button')?.textContent?.includes("Masuk Dashboard");
+      // LOGIKA 1: Sembunyikan total jika berada di rute Admin
+      if (pathname.startsWith("/admin")) {
+        setShouldShow(false);
+        return;
+      }
+
+      // LOGIKA 2: Logika intro Zora (tetap dipertahankan)
+      const isIntroActive = !localStorage.getItem('show_dashboard_zora'); 
       if (pathname !== "/") {
         setShouldShow(true);
       } else {
-        setShouldShow(!isWelcomePage);
+        // Hanya muncul jika element dashboard sudah di-render
+        setShouldShow(!!document.getElementById('main-dashboard'));
       }
     };
+
     checkVisibility();
-    window.addEventListener('click', checkVisibility);
-    return () => window.removeEventListener('click', checkVisibility);
+    const interval = setInterval(checkVisibility, 500);
+    return () => clearInterval(interval);
   }, [pathname]);
 
+  // Jika tidak memenuhi syarat atau sedang di halaman Admin, Navbar tidak di-render
   if (!shouldShow) return null;
 
   const menuItems = [
-    { id: "m1", name: "Home", href: "/", icon: <LayoutDashboard size={20} /> },
-    { id: "m2", name: "Materi", href: "/materi", icon: <BookOpen size={20} /> },
-    { id: "m3", name: "Praktikum", href: "/praktikum", icon: <FlaskConical size={20} /> },
-    { id: "m4", name: "Izin", href: "/perizinan", icon: <FileText size={20} /> },
-    { id: "m5", name: "Admin", href: "/admin", icon: <UserCog size={20} /> },
-    // Tambahkan Menu AI di sini
-    { id: "m6", name: "Zora AI", href: "#", icon: <Sparkles size={20} />, isAi: true },
+    { id: "m1", name: "Dashboard", href: "/", icon: <LayoutDashboard size={20} /> },
+    { id: "m2", name: "Resources", href: "/materi", icon: <BookOpen size={20} /> },
+    { id: "m3", name: "Laboratory", href: "/praktikum", icon: <FlaskConical size={20} /> },
+    { id: "m4", name: "Permit", href: "/perizinan", icon: <FileText size={20} /> },
+    { id: "m5", name: "System Admin", href: "/admin", icon: <UserCog size={20} /> },
   ];
 
   return (
-    <div className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[9999] flex flex-col items-end gap-3 pointer-events-none">
+    <div className="fixed left-0 top-0 h-screen w-64 bg-black border-r border-[#D4AF37]/20 z-[100] hidden lg:flex flex-col p-8 animate-in fade-in slide-in-from-left-4 duration-500">
+      <div className="mb-12">
+        <h1 className="text-[#D4AF37] text-3xl font-serif tracking-widest border-b border-[#D4AF37]/30 pb-4 italic">ZORA</h1>
+      </div>
       
-      {/* Menu List */}
-      <div className={`flex flex-col gap-2 mb-2 transition-all duration-300 transform origin-bottom ${
-        isOpen ? "scale-100 opacity-100 translate-y-0 pointer-events-auto" : "scale-0 opacity-0 translate-y-10 pointer-events-none"
-      }`}>
-        {menuItems.map((item) => (
-          item.isAi ? (
-            // Khusus tombol AI, kita pakai button, bukan Link
-            <button
-              key={item.id}
-              onClick={() => {
-                setIsOpen(false);
-                window.dispatchEvent(new Event('open-zora')); // Colek ChatBot
-              }}
-              className="flex items-center justify-end gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border pointer-events-auto bg-white/95 dark:bg-[#1a1a1a]/90 text-[#800020] dark:text-amber-400 border-slate-100 dark:border-white/10"
-            >
-              <span className="text-[10px] font-black uppercase tracking-widest">{item.name}</span>
-              <div className="bg-amber-50 dark:bg-amber-500/10 p-1 rounded-lg">
-                  {item.icon}
-              </div>
-            </button>
-          ) : (
+      <nav className="flex flex-col gap-2">
+        {menuItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
             <Link
               key={item.id}
               href={item.href}
-              onClick={() => setIsOpen(false)}
-              className={`flex items-center justify-end gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border pointer-events-auto ${
-                pathname === item.href 
-                  ? "bg-[#800020] text-white border-[#800020]" 
-                  : "bg-white/95 dark:bg-[#1a1a1a]/90 text-slate-600 dark:text-slate-300 border-slate-100 dark:border-white/10"
+              className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                isActive 
+                  ? "bg-[#D4AF37] text-black shadow-[0_0_25px_rgba(212,175,55,0.2)]" 
+                  : "text-gray-400 hover:text-[#D4AF37] hover:bg-white/5"
               }`}
             >
-              <span className="text-[10px] font-black uppercase tracking-widest">{item.name}</span>
-              <div className="bg-slate-50/50 dark:bg-white/5 p-1 rounded-lg text-inherit">
-                  {item.icon}
+              <div className={isActive ? "text-black" : "text-[#D4AF37] group-hover:scale-110 transition-transform"}>
+                {item.icon}
               </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest">{item.name}</span>
             </Link>
-          )
-        ))}
-      </div>
+          );
+        })}
+      </nav>
 
-      {/* Tombol Utama */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-14 h-14 md:w-16 md:h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 pointer-events-auto active:scale-90 ${
-          isOpen ? "bg-slate-800 rotate-90" : "bg-[#800020] hover:scale-110"
-        }`}
-      >
-        {isOpen ? <X color="white" size={26} /> : <Menu color="white" size={26} />}
-      </button>
+      <div className="mt-auto border-t border-[#D4AF37]/10 pt-6">
+        <div className="flex items-center gap-2 mb-2">
+            <div className="h-1 w-1 rounded-full bg-[#D4AF37] animate-pulse"></div>
+            <p className="text-[9px] text-gray-500 uppercase tracking-widest font-bold">Terminal Active</p>
+        </div>
+        <p className="text-[8px] text-zinc-600 uppercase tracking-[0.3em]">Agrotek Management C</p>
+      </div>
     </div>
   );
 }

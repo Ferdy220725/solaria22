@@ -16,12 +16,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// --- METADATA TERBARU: REBRANDING KE ZORA ---
+// --- METADATA ZORA SYSTEM ---
 export const metadata: Metadata = {
   title: "Zora - Manajemen Agroteknologi C",
   description: "Zora: Pusat informasi dan manajemen akademik mahasiswa Agroteknologi C. Dimana Bumi dan Ilmu Pengetahuan Bersatu.",
   keywords: ["Zora", "Zoraferrs", "Agroteknologi", "UPN", "Manajemen Kelas", "Pertanian"],
-  // Tambahkan verifikasi google jika ingin lebih paten di Search Console
   verification: {
     google: "googlec0409801ae0d1598",
   },
@@ -33,22 +32,42 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html 
+      lang="en" 
+      suppressHydrationWarning 
+      className="scroll-smooth" 
+      data-scroll-behavior="smooth"
+    >
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased transition-colors duration-700 bg-white dark:bg-[#0a0a0a] text-slate-900 dark:text-white`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased transition-colors duration-500 bg-[#fafafa] dark:bg-[#0a0a0a] text-slate-900 dark:text-zinc-100 min-h-screen flex flex-col`}
       >
-        {/* Komponen Inti Zora System */}
+        {/* Kontrol Tema & Navigasi Utama */}
         <ThemeEngine />
         <Navbar />
 
-        <main className="relative z-10">
-          {children}
+        {/* Main Wrapper: Aman untuk Mobile & Desktop */}
+        <main className="relative flex-1 w-full max-w-[100vw] overflow-x-hidden">
+          {/* Kontainer Utama dengan Padding Bawah agar tidak tertutup ChatBot di HP */}
+          <div className="min-h-screen pb-24 md:pb-12 transition-all duration-500">
+            {children}
+          </div>
         </main>
 
-        <Toaster position="top-center" richColors theme="system" />
+        {/* Layer Notifikasi */}
+        <Toaster 
+          position="top-center" 
+          richColors 
+          theme="system" 
+          closeButton
+          toastOptions={{
+            style: { borderRadius: '16px' },
+          }}
+        />
         
-        {/* Fitur Asisten AI Zora Copilot */}
-        <ChatBot />
+        {/* ChatBot Asisten Zora Copilot */}
+        <div className="fixed bottom-0 right-0 z-[60]">
+           <ChatBot />
+        </div>
       </body>
     </html>
   );

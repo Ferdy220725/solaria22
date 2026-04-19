@@ -34,7 +34,6 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    // Check if user has already entered the dashboard in this session
     const hasEntered = sessionStorage.getItem('zora_entered');
     if (hasEntered) {
       setShowDashboard(true);
@@ -45,15 +44,12 @@ export default function Dashboard() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // 1. Fetch Tasks
       const { data: taskData } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
       if (taskData) setTugas(taskData as Tugas[]);
 
-      // 2. Fetch Integrated Zoom Meeting (Assuming only 1 active meeting)
       const { data: zoom } = await supabase.from('zoom_meetings').select('*').limit(1).single();
       if (zoom) setZoomData(zoom as ZoomMeeting);
 
-      // 3. User & Progress Info
       const savedName = localStorage.getItem('nama_user_solaria') || 'Member';
       setDisplayName(savedName.trim().split(' ')[0]);
 
@@ -88,9 +84,6 @@ export default function Dashboard() {
     sessionStorage.setItem('zora_entered', 'true');
   };
 
-  // =========================================================
-  // --- VIEW 1: CINEMATIC WELCOME PAGE (THE "ZORA" DESIGN) ---
-  // =========================================================
   if (!showDashboard) {
     return (
       <>
@@ -112,14 +105,15 @@ export default function Dashboard() {
         <div className="h-screen w-full bg-black flex flex-col items-center justify-center p-6 font-serif overflow-hidden relative">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-black to-black opacity-60"></div>
 
-          <div className="relative text-center animate-in fade-in zoom-in duration-1000 ease-out">
-            <h1 className="text-[100px] md:text-[160px] font-light tracking-[0.6em] leading-none animate-shimmer select-none drop-shadow-[0_0_15px_rgba(247,239,138,0.2)]">
+          <div className="relative text-center animate-in fade-in zoom-in duration-1000 ease-out w-full max-w-full">
+            {/* REVISI HANYA DI SINI: Mengatur ukuran teks agar responsif dan tidak kepotong di HP */}
+            <h1 className="text-[60px] sm:text-[100px] md:text-[160px] font-light tracking-[0.3em] md:tracking-[0.6em] leading-none animate-shimmer select-none drop-shadow-[0_0_15px_rgba(247,239,138,0.2)] py-4">
               ZORA
             </h1>
             
             <div className="flex items-center justify-center gap-6 mt-2 mb-16 opacity-70">
               <div className="h-px w-16 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent"></div>
-              <p className="text-zinc-400 tracking-[0.6em] uppercase text-[10px] font-sans font-bold ml-[0.6em]">
+              <p className="text-zinc-400 tracking-[0.3em] md:tracking-[0.6em] uppercase text-[8px] md:text-[10px] font-sans font-bold">
                 Luxury Management System
               </p>
               <div className="h-px w-16 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent"></div>
@@ -142,24 +136,18 @@ export default function Dashboard() {
     );
   }
 
-  // =========================================================
-  // --- VIEW 2: MAIN DASHBOARD (ENGLISH) ---
-  // =========================================================
   return (
     <div id="main-dashboard" className="min-h-screen bg-gradient-to-br from-white to-zinc-100 lg:ml-64 transition-all pb-12 font-sans relative">
       
-      {/* Cinematic Header - CENTERED */}
       <header className="bg-black text-white p-16 border-b border-[#D4AF37]/20 shadow-2xl relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-black to-black opacity-70"></div>
         <div className="max-w-5xl mx-auto relative z-10 flex flex-col items-center text-center">
-          {/* PERBAIKAN: Warna teks Executive diubah ke emas (#D4AF37) agar kontras dengan header hitam */}
           <p className="text-[#D4AF37] uppercase tracking-[0.5em] text-[10px] mb-3 font-bold">Authorization Granted: {displayName}</p>
           <h1 className="text-4xl md:text-5xl font-serif tracking-tight text-white uppercase italic leading-tight">Class Management C</h1>
           <div className="h-px w-40 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent mt-8"></div>
         </div>
       </header>
 
-      {/* Main Content Area */}
       <main className="p-6 md:p-12 max-w-5xl mx-auto space-y-12 -mt-12 relative z-20">
         
         {loading ? (
@@ -169,7 +157,6 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {/* Zoom & Attendance Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="bg-white p-9 rounded-3xl shadow-xl border border-zinc-100 hover:border-[#D4AF37]/30 transition-all group relative overflow-hidden">
                 <div className="absolute -right-10 -top-10 opacity-5 group-hover:opacity-10 transition-opacity">
@@ -213,7 +200,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Assignments Console */}
             <div className="bg-white rounded-[35px] shadow-2xl border border-zinc-100 overflow-hidden relative">
               <div className="flex border-b border-zinc-100 bg-zinc-50/50 font-sans">
                 <button onClick={() => setActiveTab('pending')} className={`flex-1 py-6 text-[11px] font-bold uppercase tracking-[0.25em] transition-all relative ${activeTab === 'pending' ? 'text-black bg-white' : 'text-zinc-400 hover:text-black'}`}>

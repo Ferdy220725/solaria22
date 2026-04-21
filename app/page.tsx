@@ -1,267 +1,619 @@
 "use client";
+
+
+
 import React, { useState, useEffect } from 'react';
+
 import { createClient } from '../utils/supabase/client';
+
 import { useRouter } from 'next/navigation';
-import { Video, ExternalLink, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 
-// --- INTERFACES ---
+import Lottie from "lottie-react";
+
+import catAnimation from "../public/cat.json";
+
+
+
+// --- INTERFACE ---
+
 interface Tugas {
+
   id: string;
+
   judul_tugas: string;
+
   mk_nama: string;
-  deadline: string;
+
+  deadline: string; // ISO format
+
   deskripsi?: string;
+
   link_pengumpulan?: string;
+
 }
 
-interface ZoomMeeting {
-  id: string;
-  title: string;
-  link: string;
+
+
+interface Leader {
+
+  nama_user: string;
+
+  tugas_selesai: number;
+
 }
+
+
 
 export default function Dashboard() {
+
   const [tugas, setTugas] = useState<Tugas[]>([]);
-  const [zoomData, setZoomData] = useState<ZoomMeeting | null>(null);
+
   const [showDashboard, setShowDashboard] = useState(false);
-  const [displayName, setDisplayName] = useState('Member');
-  const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
+
+  const [displayName, setDisplayName] = useState('Hallo, Sobat Agrotek 🍃');
+
   const [completedTaskIds, setCompletedTaskIds] = useState<string[]>([]);
-  const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
+
+  const [activeTab, setActiveTab] = useState<'perlu dikerjakan' | 'sudah selesai'>('perlu dikerjakan');
+
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  const [topThree, setTopThree] = useState<Leader[]>([]);
+
+
 
   const supabase = createClient();
+
   const router = useRouter();
 
+
+
+  const today = new Date();
+
+  const todayStr = today.toISOString().split('T')[0];
+
+  const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
+  const todayName = days[today.getDay()];
+
+
+
+  const rangeETS = { start: "2026-04-06", end: "2026-04-17" };
+
+  const rangeEAS = { start: "2026-06-08", end: "2026-06-19" };
+
+  const isETS = todayStr >= rangeETS.start && todayStr <= rangeETS.end;
+
+  const isEAS = todayStr >= rangeEAS.start && todayStr <= rangeEAS.end;
+
+
+
   useEffect(() => {
-    const hasEntered = sessionStorage.getItem('zora_entered');
-    if (hasEntered) {
-      setShowDashboard(true);
-    }
-    fetchData();
+
+    fetchDataAndSync();
+
+    checkDeadlineTrigger();
+
   }, []);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const { data: taskData } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
-      if (taskData) setTugas(taskData as Tugas[]);
 
-      const { data: zoom } = await supabase.from('zoom_meetings').select('*').limit(1).single();
-      if (zoom) setZoomData(zoom as ZoomMeeting);
 
-      const savedName = localStorage.getItem('nama_user_solaria') || 'Member';
-      setDisplayName(savedName.trim().split(' ')[0]);
+  useEffect(() => {
 
-      const savedCompleted = JSON.parse(localStorage.getItem('agrotek_completed_tasks') || '[]');
-      setCompletedTaskIds(savedCompleted);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setLoading(false);
+    if (showLeaderboard) {
+
+      const timer = setTimeout(() => { setShowLeaderboard(false); }, 10000);
+
+      return () => clearTimeout(timer);
+
     }
+
+  }, [showLeaderboard]);
+
+
+
+  const fetchDataAndSync = async () => {
+
+    const { data } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
+
+    if (data) setTugas(data as Tugas[]);
+
+
+
+    const savedName = localStorage.getItem('nama_user_solaria') || 'Hallo, Sobat Agrotek';
+
+    setDisplayName(`${savedName.trim().split(' ')[0]} 🍃`);
+
+   
+
+    const savedCompleted = JSON.parse(localStorage.getItem('agrotek_completed_tasks') || '[]');
+
+    setCompletedTaskIds(savedCompleted);
+
+
+
+    await supabase.from('user_progress').upsert({
+
+      nama_user: savedName, tugas_selesai: savedCompleted.length, last_update: new Date()
+
+    }, { onConflict: 'nama_user' });
+
   };
 
-  const toggleTaskExpansion = (id: string) => {
-    setExpandedTasks(prev => ({ ...prev, [id] : !prev[id] }));
+
+
+  const checkDeadlineTrigger = async () => {
+
+    const lastShowed = localStorage.getItem('last_leaderboard_show');
+
+    const now = new Date();
+
+    if (lastShowed && (now.getTime() - new Date(lastShowed).getTime()) / (1000 * 60 * 60) < 24) return;
+
+   
+
+    const isMomentOfTruth = tugas.some(t => {
+
+      const diff = (now.getTime() - new Date(t.deadline).getTime()) / (1000 * 60);
+
+      return diff > 0 && diff < 60;
+
+    });
+
+
+
+    if (isMomentOfTruth) {
+
+      const { data: leaders } = await supabase.from('user_progress').select('nama_user, tugas_selesai').order('tugas_selesai', { ascending: false }).limit(3);
+
+      if (leaders) { setTopThree(leaders); setShowLeaderboard(true); localStorage.setItem('last_leaderboard_show', now.toISOString()); }
+
+    }
+
   };
+
+
 
   const handleToggleDone = async (id: string, isCurrentlyDone: boolean) => {
-    const newCompleted = !isCurrentlyDone ? [...completedTaskIds, id] : completedTaskIds.filter(tid => tid !== id);
+
+    const willBeDone = !isCurrentlyDone;
+
+   
+
+    // LOGIKA PERBAIKAN: Sync data antara list dan database
+
+    const newCompleted = willBeDone
+
+      ? [...completedTaskIds, id]
+
+      : completedTaskIds.filter(tid => tid !== id);
+
+
+
     setCompletedTaskIds(newCompleted);
+
     localStorage.setItem('agrotek_completed_tasks', JSON.stringify(newCompleted));
+
+   
+
+    const rawName = localStorage.getItem('nama_user_solaria') || 'Sobat Agrotek';
+
+   
+
+    // Update Supabase menggunakan jumlah item asli di list agar tidak over 100%
+
+    await supabase.from('user_progress').upsert({
+
+      nama_user: rawName,
+
+      tugas_selesai: newCompleted.length,
+
+      last_update: new Date()
+
+    }, { onConflict: 'nama_user' });
+
+
+
+    if (willBeDone) {
+
+      const { data: leaders } = await supabase
+
+        .from('user_progress')
+
+        .select('nama_user, tugas_selesai')
+
+        .order('tugas_selesai', { ascending: false })
+
+        .limit(3);
+
+       
+
+      if (leaders) {
+
+        setTopThree(leaders);
+
+        setShowLeaderboard(true);
+
+      }
+
+    }
+
   };
+
+
 
   const formatDeadline = (dateStr: string) => {
+
     const d = new Date(dateStr);
-    return d.toLocaleString('en-US', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const dayName = days[d.getDay()];
+
+    const date = d.getDate().toString().padStart(2, '0');
+
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+
+    const year = d.getFullYear();
+
+    const hours = d.getHours().toString().padStart(2, '0');
+
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+
+    return `${dayName}, ${date}/${month}/${year} pukul ${hours}:${minutes} WIB`;
+
   };
 
-  const displayedTugas = tugas.filter(t => activeTab === 'pending' ? !completedTaskIds.includes(t.id) : completedTaskIds.includes(t.id));
 
-  const enterDashboard = () => {
-    setShowDashboard(true);
-    sessionStorage.setItem('zora_entered', 'true');
+
+  const isMepet = (dateStr: string) => {
+
+    const diff = new Date(dateStr).getTime() - new Date().getTime();
+
+    return diff > 0 && diff < (6 * 60 * 60 * 1000);
+
   };
+
+
+
+  const persentase = tugas.length > 0 ? (completedTaskIds.length / tugas.length) * 100 : 0;
+
+ 
+
+  const getPlant = () => {
+
+    if (persentase === 0) return { e: "🟫", t: "Lahan Kosong", c: "text-amber-900" };
+
+    if (persentase >= 100) return { e: "🧺", t: "Siap Panen!", c: "text-orange-600" }; // FIX: Status 100%
+
+    if (persentase <= 30) return { e: "🌱", t: "Baru Tumbuh", c: "text-green-700" };
+
+    if (persentase <= 70) return { e: "🌿", t: "Mulai Rimbun", c: "text-green-800" };
+
+    return { e: "🌳", t: "Hampir Panen", c: "text-green-900" };
+
+  };
+
+  const plant = getPlant();
+
+
+
+  const displayedTugas = tugas.filter(t => activeTab === 'perlu dikerjakan' ? !completedTaskIds.includes(t.id) : completedTaskIds.includes(t.id));
+
+
 
   if (!showDashboard) {
+
     return (
-      <>
-        <style jsx global>{`
-          @keyframes shimmer {
-            0% { background-position: -200% center; }
-            100% { background-position: 200% center; }
-          }
-          .animate-shimmer {
-            background: linear-gradient(90deg, #b8860b 0%, #f7ef8a 25%, #d4af37 50%, #f7ef8a 75%, #b8860b 100%);
-            background-size: 200% auto;
-            color: transparent;
-            -webkit-background-clip: text;
-            background-clip: text;
-            animation: shimmer 10s linear infinite;
-          }
-        `}</style>
 
-        <div className="h-screen w-full bg-black flex flex-col items-center justify-center p-6 font-serif overflow-hidden relative">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-black to-black opacity-60"></div>
+      <div className="h-screen w-full bg-[#f8f9fa] flex flex-col items-center justify-center p-6">
 
-          <div className="relative text-center animate-in fade-in zoom-in duration-1000 ease-out w-full max-w-full">
-            {/* REVISI HANYA DI SINI: Mengatur ukuran teks agar responsif dan tidak kepotong di HP */}
-            <h1 className="text-[60px] sm:text-[100px] md:text-[160px] font-light tracking-[0.3em] md:tracking-[0.6em] leading-none animate-shimmer select-none drop-shadow-[0_0_15px_rgba(247,239,138,0.2)] py-4">
-              ZORA
-            </h1>
-            
-            <div className="flex items-center justify-center gap-6 mt-2 mb-16 opacity-70">
-              <div className="h-px w-16 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent"></div>
-              <p className="text-zinc-400 tracking-[0.3em] md:tracking-[0.6em] uppercase text-[8px] md:text-[10px] font-sans font-bold">
-                Luxury Management System
-              </p>
-              <div className="h-px w-16 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent"></div>
-            </div>
+        <div className="w-48 h-48 md:w-64 md:h-64 mb-2"><Lottie animationData={catAnimation} loop={true} /></div>
 
-            <button 
-              onClick={enterDashboard} 
-              className="relative px-16 py-5 border border-[#D4AF37]/50 text-[#D4AF37] hover:border-[#D4AF37] hover:text-black hover:bg-[#D4AF37] transition-all duration-700 rounded-full tracking-[0.3em] text-[11px] uppercase font-sans font-bold group overflow-hidden"
-            >
-              <span className="relative z-10">Access Terminal</span>
-              <div className="absolute inset-0 bg-[#D4AF37] scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out z-0"></div>
-            </button>
-          </div>
+        <div className="text-center bg-white p-8 rounded-[35px] shadow-2xl border-b-[8px] border-[#800020] w-full max-w-sm border-2 border-slate-200">
 
-          <div className="absolute bottom-10 text-[9px] text-zinc-700 uppercase tracking-widest font-sans font-bold">
-            Powered by FeZo
-          </div>
+          <h1 className="text-2xl font-black text-[#800020] uppercase leading-tight italic">HALLO, {displayName}</h1>
+
+          <button onClick={() => setShowDashboard(true)} className="w-full mt-6 bg-[#800020] text-white py-4 rounded-xl font-black uppercase shadow-lg active:scale-95 transition-all">Buka Dashboard →</button>
+
         </div>
-      </>
+
+      </div>
+
     );
+
   }
 
+
+
   return (
-    <div id="main-dashboard" className="min-h-screen bg-gradient-to-br from-white to-zinc-100 lg:ml-64 transition-all pb-12 font-sans relative">
-      
-      <header className="bg-black text-white p-16 border-b border-[#D4AF37]/20 shadow-2xl relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-black to-black opacity-70"></div>
-        <div className="max-w-5xl mx-auto relative z-10 flex flex-col items-center text-center">
-          <p className="text-[#D4AF37] uppercase tracking-[0.5em] text-[10px] mb-3 font-bold">Authorization Granted: {displayName}</p>
-          <h1 className="text-4xl md:text-5xl font-serif tracking-tight text-white uppercase italic leading-tight">Class Management C</h1>
-          <div className="h-px w-40 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent mt-8"></div>
-        </div>
-      </header>
 
-      <main className="p-6 md:p-12 max-w-5xl mx-auto space-y-12 -mt-12 relative z-20">
-        
-        {loading ? (
-          <div className="py-24 flex flex-col items-center justify-center gap-4 text-zinc-400 font-serif italic">
-            <Loader2 className="animate-spin text-[#D4AF37]" size={32} />
-            Initializing ...
+    <div className="min-h-screen bg-[#fcfcfc] font-sans pb-20 overflow-x-hidden">
+
+      {showLeaderboard && (
+
+        <div className="fixed inset-0 z-[999] bg-[#800020] flex items-center justify-center p-6 text-white animate-in fade-in duration-500">
+
+          <div className="max-w-2xl w-full text-center">
+
+            <h2 className="text-4xl md:text-7xl font-black mb-8 uppercase italic leading-none">THE HARVEST KINGS 👑</h2>
+
+            <div className="grid grid-cols-1 gap-4">
+
+              {topThree.map((user, i) => (
+
+                <div key={i} className={`flex items-center justify-between p-6 rounded-[30px] border-b-8 ${i === 0 ? 'bg-orange-500 border-orange-700' : 'bg-white/10'}`}>
+
+                  <div className="flex items-center gap-5">
+
+                    <span className="text-4xl">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
+
+                    <p className="font-black text-xl uppercase">{user.nama_user}</p>
+
+                  </div>
+
+                  <span className="font-black text-2xl">{user.tugas_selesai}</span>
+
+                </div>
+
+              ))}
+
+            </div>
+
           </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="bg-white p-9 rounded-3xl shadow-xl border border-zinc-100 hover:border-[#D4AF37]/30 transition-all group relative overflow-hidden">
-                <div className="absolute -right-10 -top-10 opacity-5 group-hover:opacity-10 transition-opacity">
-                  <Video size={150} className="text-black"/>
-                </div>
-                <div className="relative z-10">
-                  <div className="flex items-center gap-3 mb-5">
-                    <Video className="text-[#D4AF37]" size={18} />
-                    <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest font-sans">Virtual Conference Hub</h2>
-                  </div>
-                  {zoomData ? (
-                    <div className="space-y-5">
-                      <p className="text-base font-serif italic text-zinc-900 leading-snug">{zoomData.title}</p>
-                      <a 
-                        href={zoomData.link} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between bg-zinc-50 hover:bg-black p-5 rounded-2xl border border-zinc-100 group transition-all duration-300"
-                      >
-                        <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-black group-hover:text-[#D4AF37]">Initialize Link</span>
-                        <ExternalLink size={16} className="text-[#D4AF37]" />
-                      </a>
+
+        </div>
+
+      )}
+
+
+
+      {(isETS || isEAS) && (
+
+        <div className="sticky top-0 z-[60] bg-red-600 text-white py-3 border-b-4 border-yellow-400 text-center font-black uppercase text-xs md:text-sm tracking-widest shadow-xl px-4">
+
+          🚨 MINGGU {isETS ? 'ETS' : 'EAS'} SEDANG BERLANGSUNG! SEMANGAT! 🚨
+
+        </div>
+
+      )}
+
+
+
+      <div className={`p-4 md:p-10 max-w-7xl mx-auto transition-all ${showLeaderboard ? 'blur-2xl' : ''}`}>
+
+       
+
+        <div className="mb-10 flex flex-col items-center text-center border-b-4 border-slate-300 pb-8">
+
+          <h1 className="text-3xl md:text-6xl font-black text-[#800020] uppercase leading-none italic mb-3 tracking-tighter">SISTEM MANAJEMEN KELAS C</h1>
+
+          <p className="text-[11px] md:text-sm font-black text-slate-800 uppercase tracking-[0.2em] italic mb-1">Uni Terra Et Scienta Coniunguntur</p>
+
+          <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-[0.4em]">Dimana Bumi dan Ilmu Pengetahuan Bersatu</p>
+
+          <div className="mt-6 bg-slate-800 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md">
+
+            {todayName}, {todayStr}
+
+          </div>
+
+        </div>
+
+
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+          <div className="space-y-6">
+
+            <div className="bg-white p-8 rounded-[40px] shadow-xl border-t-[10px] border-green-800 text-center border-2 border-slate-200">
+
+              <div className="text-8xl mb-4">{plant.e}</div>
+
+              <h3 className={`font-black uppercase text-sm ${plant.c}`}>{plant.t}</h3>
+
+              <div className="w-full bg-slate-100 h-4 rounded-full mt-6 border-slate-300 border-2 overflow-hidden">
+
+                <div className="bg-green-700 h-full transition-all duration-1000 shadow-[0_0_10px_rgba(21,128,61,0.5)]" style={{ width: `${persentase}%` }}></div>
+
+              </div>
+
+              <p className="text-[11px] font-black text-slate-700 mt-3 uppercase tracking-widest">{Math.round(persentase)}% Selesai</p>
+
+            </div>
+
+
+
+            <div className="bg-white p-6 rounded-[35px] shadow-xl border-l-[10px] border-[#800020] border-2 border-slate-200">
+
+               <p className="text-[10px] font-black text-slate-400 uppercase italic mb-3">Status Akademik Saat Ini:</p>
+
+               <div className={`p-4 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-3 border-2 shadow-inner ${isETS || isEAS ? 'bg-red-50 border-red-200 text-red-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+
+                  <span className="text-xl">{isETS || isEAS ? '⚡' : '📖'}</span>
+
+                  {isETS || isEAS ? 'Evaluasi Semester Aktif' : 'Masa Perkuliahan Aktif'}
+
+               </div>
+
+            </div>
+
+           
+
+            <button onClick={() => router.push('/absensi')} className="w-full bg-[#800020] text-white p-6 rounded-[35px] font-black uppercase text-2xl border-b-8 border-[#5a0016] italic active:scale-95 transition-all shadow-xl">📝 Isi Absensi</button>
+
+            <button onClick={() => setShowDashboard(false)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-red-700 transition-colors">← Kembali ke Intro</button>
+
+          </div>
+
+
+
+          <div className="lg:col-span-2 bg-white p-6 md:p-8 rounded-[40px] shadow-xl border-t-[10px] border-[#004d40] border-2 border-slate-200">
+
+            <div className="flex gap-2 mb-8 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+
+              <button onClick={() => setActiveTab('perlu dikerjakan')} className={`flex-1 py-4 rounded-xl text-xs font-black uppercase transition-all ${activeTab === 'perlu dikerjakan' ? 'bg-[#004d40] text-white shadow-lg scale-[1.02]' : 'text-slate-500 hover:bg-slate-200'}`}>Daftar Tugas</button>
+
+              <button onClick={() => setActiveTab('sudah selesai')} className={`flex-1 py-4 rounded-xl text-xs font-black uppercase transition-all ${activeTab === 'sudah selesai' ? 'bg-green-800 text-white shadow-lg scale-[1.02]' : 'text-slate-500 hover:bg-slate-200'}`}>Selesai</button>
+
+            </div>
+
+
+
+            <div className="grid grid-cols-1 gap-6">
+
+              {displayedTugas.length > 0 ? displayedTugas.map((t) => {
+
+                const isLewat = new Date().getTime() > new Date(t.deadline).getTime();
+
+               
+
+                return (
+
+                <div key={t.id} className={`p-6 md:p-8 rounded-[35px] border-2 transition-all flex flex-col gap-4 ${isMepet(t.deadline) && activeTab === 'perlu dikerjakan' ? 'bg-red-50 border-red-400 shadow-[0_0_20px_rgba(220,38,38,0.1)]' : 'bg-[#fdfdfd] border-slate-200 hover:border-[#004d40]'}`}>
+
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+
+                    <span className="px-3 py-1 bg-slate-800 text-white text-[9px] font-black uppercase rounded-lg italic tracking-tighter">{t.mk_nama}</span>
+
+                    <div className={`flex items-center gap-2 text-[10px] font-black uppercase ${isLewat && activeTab === 'perlu dikerjakan' ? 'text-red-600' : isMepet(t.deadline) && activeTab === 'perlu dikerjakan' ? 'text-red-600 animate-pulse' : 'text-slate-500'}`}>
+
+                      <span>⏱️ DEADLINE:</span>
+
+                      <span>{formatDeadline(t.deadline)}</span>
+
                     </div>
-                  ) : (
-                    <p className="text-xs text-zinc-400 italic font-serif">No conference link currently active.</p>
+
+                  </div>
+
+
+
+                  {isLewat && activeTab === 'perlu dikerjakan' ? (
+
+                    <div className="bg-red-700 text-white text-[9px] font-black py-1 px-3 rounded-md self-start uppercase tracking-widest">
+
+                      WAKTU HABIS! AKSES DITUTUP
+
+                    </div>
+
+                  ) : isMepet(t.deadline) && activeTab === 'perlu dikerjakan' && (
+
+                    <div className="bg-red-600 text-white text-[9px] font-black py-1 px-3 rounded-md self-start uppercase tracking-widest animate-bounce">
+
+                      SANGAT MEPET! SEGERA SELESAIKAN!
+
+                    </div>
+
                   )}
-                </div>
-              </div>
 
-              <div className="bg-white p-9 rounded-3xl shadow-xl border border-zinc-100 relative overflow-hidden">
-                <div className="flex items-center gap-3 mb-6 relative z-10">
-                  <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse border-4 border-green-200"></div>
-                  <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest font-sans">Live Attendance Portal</h2>
-                </div>
-                <button 
-                  onClick={() => router.push('/absensi')} 
-                  className="w-full bg-black text-[#D4AF37] hover:bg-zinc-900 py-5 rounded-2xl font-bold uppercase tracking-[0.25em] text-[11px] hover:scale-[1.01] transition-all shadow-lg shadow-black/10 relative z-10 font-sans"
-                >
-                  Log Presence
-                </button>
-              </div>
-            </div>
 
-            <div className="bg-white rounded-[35px] shadow-2xl border border-zinc-100 overflow-hidden relative">
-              <div className="flex border-b border-zinc-100 bg-zinc-50/50 font-sans">
-                <button onClick={() => setActiveTab('pending')} className={`flex-1 py-6 text-[11px] font-bold uppercase tracking-[0.25em] transition-all relative ${activeTab === 'pending' ? 'text-black bg-white' : 'text-zinc-400 hover:text-black'}`}>
-                  Active Assignments
-                  {activeTab === 'pending' && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-20 bg-[#D4AF37]"></div>}
-                </button>
-                <button onClick={() => setActiveTab('completed')} className={`flex-1 py-6 text-[11px] font-bold uppercase tracking-[0.25em] transition-all relative ${activeTab === 'completed' ? 'text-black bg-white' : 'text-zinc-400 hover:text-black'}`}>
-                  Archive
-                  {activeTab === 'completed' && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-20 bg-[#D4AF37]"></div>}
-                </button>
-              </div>
 
-              <div className="p-10 divide-y divide-zinc-100">
-                {displayedTugas.length > 0 ? displayedTugas.map((t) => (
-                  <div key={t.id} className="py-10 first:pt-0 last:pb-0">
-                    <div className="flex flex-col md:flex-row justify-between gap-8">
-                      <div className="flex-1 space-y-3">
-                        <span className="text-[#D4AF37] text-[10px] font-extrabold uppercase tracking-[0.35em] font-sans">{t.mk_nama}</span>
-                        <h3 className="text-2xl font-serif text-zinc-950 tracking-tight leading-tight">{t.judul_tugas}</h3>
-                        <div className="flex items-center gap-4 text-zinc-500 text-[11px] font-bold uppercase tracking-tight font-sans bg-zinc-50 p-2 rounded-md w-fit border border-zinc-100">
-                          <span>Deadline: {formatDeadline(t.deadline)}</span>
-                        </div>
+                  <h3 className={`font-black text-2xl md:text-3xl uppercase leading-none tracking-tighter ${activeTab === 'sudah selesai' ? 'line-through text-slate-300' : 'text-slate-900'}`}>{t.judul_tugas}</h3>
+
+                 
+
+                  {t.deskripsi && (
+
+                    <details className="group cursor-pointer">
+
+                      <summary className="text-[10px] font-black text-[#004d40] uppercase tracking-widest list-none flex items-center gap-1 group-open:mb-3">
+
+                        {activeTab === 'sudah selesai' ? '' : '📂 Lihat Deskripsi Tugas [+ ]'}
+
+                      </summary>
+
+                      <div className="p-5 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+
+                        <p className="text-[13px] text-slate-700 font-medium leading-relaxed whitespace-pre-line">{t.deskripsi}</p>
+
                       </div>
-                      
-                      <div className="flex items-center gap-3 h-fit mt-2 md:mt-0">
-                        {t.link_pengumpulan && activeTab === 'pending' && (
-                          <a href={t.link_pengumpulan} target="_blank" className="px-7 py-3 bg-black text-white hover:bg-zinc-800 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all font-sans">Submit Port</a>
-                        )}
-                        <button onClick={() => handleToggleDone(t.id, activeTab === 'completed')} className="px-7 py-3 border-2 border-zinc-100 rounded-full text-[10px] font-bold uppercase tracking-widest hover:border-[#D4AF37]/50 hover:text-[#D4AF37] transition-all font-sans bg-white hover:bg-zinc-50">
-                          {activeTab === 'pending' ? "Mark Archived" : "Restore"}
-                        </button>
-                      </div>
-                    </div>
 
-                    {t.deskripsi && (
-                      <div className="mt-6 border-t border-dashed border-zinc-100 pt-6">
-                        <button 
-                          onClick={() => toggleTaskExpansion(t.id)}
-                          className="text-[11px] font-bold text-[#D4AF37] uppercase tracking-[0.15em] flex items-center gap-2.5 hover:opacity-70 transition-opacity font-sans"
-                        >
-                          {expandedTasks[t.id] ? <><ChevronUp size={15}/> Hide Details</> : <><ChevronDown size={15}/> View Details</>}
-                        </button>
-                        
-                        {expandedTasks[t.id] && (
-                          <div className="mt-5 p-7 bg-zinc-50 rounded-2xl border-l-4 border-[#D4AF37]/50 animate-in slide-in-from-top-3 duration-500 ease-out relative overflow-hidden">
-                            <div className="absolute right-4 top-4 text-xs font-black uppercase tracking-widest text-zinc-200 select-none font-sans">Description</div>
-                            <p className="text-zinc-700 text-sm leading-relaxed whitespace-pre-line font-medium italic font-serif relative z-10">
-                              {t.deskripsi}
-                            </p>
-                          </div>
-                        )}
-                      </div>
+                    </details>
+
+                  )}
+
+
+
+                  <div className="flex flex-col sm:flex-row gap-3 mt-2">
+
+                    {t.link_pengumpulan && activeTab === 'perlu dikerjakan' && !isLewat && (
+
+                      <a href={t.link_pengumpulan} target="_blank" rel="noopener noreferrer" className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black uppercase text-xs text-center shadow-lg hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+
+                        🚀 Kumpulkan Sekarang
+
+                      </a>
+
                     )}
+
+                   
+
+                    {activeTab === 'perlu dikerjakan' ? (
+
+                      isLewat ? (
+
+                        <div className="flex-1 py-4 rounded-2xl font-black uppercase text-xs border-4 border-red-200 text-red-400 text-center bg-red-50 opacity-60 cursor-not-allowed">
+
+                          ❌ Deadline Berakhir
+
+                        </div>
+
+                      ) : (
+
+                        <button
+
+                          onClick={() => handleToggleDone(t.id, false)}
+
+                          className="flex-1 py-4 rounded-2xl font-black uppercase text-xs border-4 border-green-700 text-green-800 hover:bg-green-50 active:scale-95 transition-all"
+
+                        >
+
+                          Selesai ✓
+
+                        </button>
+
+                      )
+
+                    ) : (
+
+                      <button
+
+                        onClick={() => handleToggleDone(t.id, true)}
+
+                        className="flex-1 py-4 rounded-2xl font-black uppercase text-xs border-4 border-slate-300 text-slate-400 hover:bg-slate-50 active:scale-95 transition-all"
+
+                      >
+
+                        Batal Selesai
+
+                      </button>
+
+                    )}
+
                   </div>
-                )) : (
-                  <div className="py-24 text-center opacity-40 italic font-serif text-zinc-400 border-2 border-dashed border-zinc-100 rounded-2xl">Terminal data stream is empty.</div>
-                )}
-              </div>
+
+                </div>
+
+              )}) : (
+
+                <div className="py-24 text-center">
+
+                  <div className="text-6xl mb-4 grayscale opacity-30">📦</div>
+
+                  <p className="text-slate-300 font-black uppercase italic text-2xl tracking-[0.2em]">Tidak Ada Tugas</p>
+
+                </div>
+
+              )}
+
             </div>
-          </>
-        )}
-      </main>
+
+          </div>
+
+        </div>
+
+      </div>
+
     </div>
+
   );
+
 }

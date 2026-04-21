@@ -1,199 +1,361 @@
 "use client";
-import React, { useState, useRef } from 'react';
-import SignatureCanvas from 'react-signature-canvas';
-import { createClient } from '../../utils/supabase/client';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import { PDFDocument } from 'pdf-lib';
 
-export default function PerizinanPage() {
-  const [nama, setNama] = useState('');
-  const [npm, setNpm] = useState('');
-  const [prodi, setProdi] = useState('');
-  const [tglIzin, setTglIzin] = useState('');
-  const [mk, setMk] = useState('');
-  const [alasan, setAlasan] = useState('');
-  const [namaWali, setNamaWali] = useState('');
-  const [suratDokter, setSuratDokter] = useState<File | null>(null);
-  
-  const [isUploading, setIsUploading] = useState(false);
-  
-  const sigCanvasMhs = useRef<any>(null);
-  const sigCanvasWali = useRef<any>(null);
-  const suratRef = useRef<HTMLDivElement>(null);
-  
-  const supabase = createClient();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (sigCanvasMhs.current.isEmpty() || sigCanvasWali.current.isEmpty()) {
-      return alert("Kedua tanda tangan (Mahasiswa & Wali) harus diisi!");
-    }
 
-    setIsUploading(true);
+import React, { useState, useEffect } from 'react';
 
-    try {
-      const element = suratRef.current;
-      if (!element) return;
+import { createClient } from '@/utils/supabase/client';
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
 
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        logging: false,
-        ignoreElements: (el) => el.classList.contains('no-pdf')
-      });
+import { FileText, Search, Loader2, ChevronRight } from 'lucide-react';
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdfIzin = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdfIzin.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      pdfIzin.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      const pdfIzinBytes = pdfIzin.output('arraybuffer');
 
-      let finalPdfUint8: Uint8Array;
 
-      if (suratDokter) {
-        const mainPdfDoc = await PDFDocument.load(pdfIzinBytes);
-        
-        if (suratDokter.type === 'application/pdf') {
-          const attachmentPdfBytes = await suratDokter.arrayBuffer();
-          const attachmentPdfDoc = await PDFDocument.load(attachmentPdfBytes);
-          const copiedPages = await mainPdfDoc.copyPages(attachmentPdfDoc, attachmentPdfDoc.getPageIndices());
-          copiedPages.forEach((page) => mainPdfDoc.addPage(page));
-        } else {
-          const imgBytes = await suratDokter.arrayBuffer();
-          const page = mainPdfDoc.addPage();
-          let embeddedImg;
-          if (suratDokter.type === 'image/png') embeddedImg = await mainPdfDoc.embedPng(imgBytes);
-          else embeddedImg = await mainPdfDoc.embedJpg(imgBytes);
+// --- KOMPONEN INTERAKTIF (PREMIUM 3D EFFECT) ---
 
-          const { width, height } = embeddedImg.scaleToFit(page.getWidth() - 40, page.getHeight() - 40);
-          page.drawImage(embeddedImg, { x: 20, y: page.getHeight() - height - 20, width, height });
-        }
-        finalPdfUint8 = await mainPdfDoc.save();
-      } else {
-        finalPdfUint8 = new Uint8Array(pdfIzinBytes);
-      }
+function InteractiveCard({ children }: { children: React.ReactNode }) {
 
-      const pdfBlob = new Blob([finalPdfUint8.buffer as ArrayBuffer], { type: 'application/pdf' });
-      const fileName = `surat-izin/Surat_Lengkap_${npm}_${Date.now()}.pdf`;
+  const x = useMotionValue(0);
 
-      const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
-      if (uploadError) throw uploadError;
+  const y = useMotionValue(0);
 
-      const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(fileName);
-      
-      const { error: dbError } = await supabase.from('perizinan').insert([{ 
-          nama_lengkap: nama, npm, tgl_izin: tglIzin, mk_nama: mk, file_pdf_url: urlData.publicUrl 
-      }]);
+  const mouseXSpring = useSpring(x);
 
-      if (dbError) throw dbError;
-      alert("Surat Izin Berhasil Terkirim!");
-      window.location.reload();
+  const mouseYSpring = useSpring(y);
 
-    } catch (error: any) {
-      alert("Terjadi kesalahan: " + error.message);
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  const rotateX = useTransform(mouseYSpring, [-100, 100], [7, -7]);
+
+  const rotateY = useTransform(mouseXSpring, [-100, 100], [-7, 7]);
+
+
+
+  function handleMouseMove(event: React.MouseEvent<HTMLDivElement>) {
+
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    const centerX = rect.left + rect.width / 2;
+
+    const centerY = rect.top + rect.height / 2;
+
+    x.set(event.clientX - centerX);
+
+    y.set(event.clientY - centerY);
+
+  }
+
+
+
+  function handleMouseLeave() {
+
+    x.set(0);
+
+    y.set(0);
+
+  }
+
+
 
   return (
-    <div className="min-h-screen bg-slate-200 py-10 px-4 flex flex-col items-center font-sans">
-      
-      <div ref={suratRef} className="bg-white shadow-2xl p-12 md:p-20 border border-slate-300 text-black font-serif w-full max-w-[210mm] min-h-[297mm] leading-relaxed">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          
-          <div className="text-center mb-10">
-            <h2 className="font-bold text-xl underline uppercase tracking-widest">SURAT IZIN TIDAK MENGIKUTI PERKULIAHAN</h2>
-          </div>
 
-          <div className="mb-8 space-y-1">
-            <p>Kepada Yth.</p>
-            <p className="font-bold">Bapak/Ibu Dosen Pengampu Mata Kuliah</p>
-            <p>Di tempat</p>
-          </div>
+    <motion.div
 
-          <p>Dengan hormat, saya yang bertanda tangan di bawah ini:</p>
+      style={{ perspective: 1200, rotateX, rotateY }}
 
-          {/* Bagian Data Diri - TANPA GARIS */}
-          <div className="grid grid-cols-[160px_10px_1fr] gap-y-2 ml-4 items-center">
-            <span className="font-medium">Nama</span><span>:</span>
-            <input type="text" className="outline-none px-1 bg-slate-50/50 focus:bg-white transition-colors w-full h-7 font-sans font-bold" onChange={e => setNama(e.target.value)} required />
-            
-            <span className="font-medium">NPM</span><span>:</span>
-            <input type="text" className="outline-none px-1 bg-slate-50/50 focus:bg-white transition-colors w-full h-7 font-sans font-bold" onChange={e => setNpm(e.target.value)} required />
-            
-            <span className="font-medium">Program Studi</span><span>:</span>
-            <input type="text" className="outline-none px-1 bg-slate-50/50 focus:bg-white transition-colors w-full h-7 font-sans font-bold" onChange={e => setProdi(e.target.value)} required />
-          </div>
+      onMouseMove={handleMouseMove}
 
-          <p className="mt-8 font-semibold">Mengajukan permohonan izin tidak mengikuti perkuliahan pada:</p>
+      onMouseLeave={handleMouseLeave}
 
-          {/* Bagian Detail Izin - TANPA GARIS */}
-          <div className="grid grid-cols-[160px_10px_1fr] gap-y-2 ml-4 items-center">
-            <span className="font-medium">Hari/Tanggal</span><span>:</span>
-            <input type="date" className="outline-none px-1 bg-slate-50/50 focus:bg-white transition-colors w-full h-7 font-sans font-bold" onChange={e => setTglIzin(e.target.value)} required />
-            
-            <span className="font-medium">Mata Kuliah</span><span>:</span>
-            <input type="text" className="outline-none px-1 bg-slate-50/50 focus:bg-white transition-colors w-full h-7 font-sans font-bold" placeholder="..." onChange={e => setMk(e.target.value)} required />
-            
-            <span className="font-medium">Alasan</span><span>:</span>
-            <input type="text" className="outline-none px-1 bg-slate-50/50 focus:bg-white transition-colors w-full h-7 font-sans font-bold" placeholder="..." onChange={e => setAlasan(e.target.value)} required />
-          </div>
+      className="w-full h-full"
 
-          <p className="text-justify pt-8">
-            Demikian surat permohonan izin ini saya sampaikan. Atas perhatian dan kebijaksanaan Bapak/Ibu Dosen, saya mengucapkan terima kasih.
-          </p>
+    >
 
-          {/* Input Lampiran (no-pdf) */}
-          <div className="no-pdf bg-slate-50 p-6 rounded-2xl border border-slate-200 mt-10">
-            <label className="block text-sm font-black text-slate-700 mb-2 uppercase">📁 Lampiran Surat Dokter (Opsional)</label>
-            <input type="file" accept="image/*,application/pdf" onChange={(e) => setSuratDokter(e.target.files?.[0] || null)} className="text-xs w-full file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300" />
-          </div>
+      {children}
 
-          {/* Area Tanda Tangan - TANPA GARIS BAWAH (Pake Nama Tebal Saja) */}
-          <div className="mt-20 flex justify-between gap-10 text-center">
-            <div className="flex-1 space-y-4">
-              <div>
-                <p>Mengetahui,</p>
-                <p>Orang Tua / Wali</p>
-              </div>
-              <div className="border border-dashed border-slate-200 rounded-xl p-1 bg-slate-50/30">
-                <SignatureCanvas ref={sigCanvasWali} penColor="black" canvasProps={{width: 200, height: 120, className: 'sigCanvas'}} />
-                <button type="button" onClick={() => sigCanvasWali.current.clear()} className="no-pdf text-[9px] text-red-500 block w-full mt-1 uppercase">Hapus</button>
-              </div>
-              <input type="text" className="outline-none w-full font-bold uppercase text-base text-center bg-transparent border border-slate-100 rounded-md py-1" placeholder="[ NAMA WALI ]" onChange={e => setNamaWali(e.target.value)} required />
-            </div>
+    </motion.div>
 
-            <div className="flex-1 space-y-4">
-              <div>
-                <p className="invisible">Space</p>
-                <p>Hormat Saya,</p>
-              </div>
-              <div className="border border-dashed border-slate-200 rounded-xl p-1 bg-slate-50/30">
-                <SignatureCanvas ref={sigCanvasMhs} penColor="black" canvasProps={{width: 200, height: 120, className: 'sigCanvas'}} />
-                <button type="button" onClick={() => sigCanvasMhs.current.clear()} className="no-pdf text-[9px] text-red-500 block w-full mt-1 uppercase">Hapus</button>
-              </div>
-              <div className="py-1">
-                <p className="font-bold underline uppercase text-base">{nama || "NAMA MAHASISWA"}</p>
-                <p className="text-sm font-sans">NPM. {npm || "........"}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="no-pdf pt-16">
-            <button type="submit" disabled={isUploading} className={`w-full py-5 rounded-3xl font-black text-white transition-all shadow-xl uppercase tracking-widest ${isUploading ? 'bg-slate-400' : 'bg-[#800020] hover:bg-black'}`}>
-              {isUploading ? "Menggabungkan PDF..." : "Kirim Surat Sekarang"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
   );
+
+}
+
+
+
+interface Materi {
+
+  id: string;
+
+  judul: string;
+
+  mk_nama: string;
+
+  file_url: string;
+
+}
+
+
+
+export default function MateriPage() {
+
+  const [materiList, setMateriList] = useState<Materi[]>([]);
+
+  const [filter, setFilter] = useState('Semua');
+
+  const [loading, setLoading] = useState(true);
+
+ 
+
+  const supabase = createClient();
+
+
+
+  useEffect(() => {
+
+    async function fetchData() {
+
+      try {
+
+        setLoading(true);
+
+        const { data, error } = await supabase
+
+          .from('materi')
+
+          .select('*')
+
+          .order('created_at', { ascending: false });
+
+       
+
+        if (data) setMateriList(data as Materi[]);
+
+      } catch (err) {
+
+        console.error("Error:", err);
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    }
+
+    fetchData();
+
+  }, [supabase]);
+
+
+
+  const daftarMK = Array.from(new Set(materiList.map(m => m.mk_nama)));
+
+  const filteredMateri = filter === 'Semua' ? materiList : materiList.filter(m => m.mk_nama === filter);
+
+
+
+  return (
+
+    <div className="min-h-screen bg-[#fafafa] lg:ml-64 transition-all pb-32 font-sans relative">
+
+     
+
+      {/* Cinematic Header (ZORA Style) */}
+
+      <header className="bg-black text-white p-20 border-b border-[#D4AF37]/20 shadow-2xl relative overflow-hidden">
+
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#1a1a1a_0%,_#000000_100%)] opacity-80"></div>
+
+        <div className="max-w-6xl mx-auto relative z-10 flex flex-col items-center text-center">
+
+          <div className="flex items-center gap-4 mb-4">
+
+             <div className="h-[1px] w-12 bg-[#D4AF37]"></div>
+
+             <p className="text-[#D4AF37] uppercase tracking-[0.5em] text-[10px] font-bold">Academic Resources</p>
+
+             <div className="h-[1px] w-12 bg-[#D4AF37]"></div>
+
+          </div>
+
+          <h1 className="text-5xl md:text-6xl font-serif tracking-tight text-white uppercase italic leading-tight">
+
+            Lecture <span className="text-[#D4AF37] not-italic font-light tracking-[0.1em]">Materials</span>
+
+          </h1>
+
+        </div>
+
+      </header>
+
+
+
+      {/* Content Area */}
+
+      <main className="p-8 md:p-16 max-w-6xl mx-auto -mt-16 relative z-20">
+
+       
+
+        {/* Filter Section (Elegant & Minimal) */}
+
+        <div className="flex justify-center mb-16">
+
+          <div className="bg-white p-2 rounded-full shadow-xl border border-zinc-100 flex items-center gap-2 max-w-md w-full">
+
+            <div className="pl-6 text-[#D4AF37]">
+
+              <Search size={18} />
+
+            </div>
+
+            <select
+
+              className="w-full bg-transparent p-4 rounded-full font-bold text-[10px] uppercase tracking-widest text-zinc-500 outline-none cursor-pointer appearance-none"
+
+              onChange={(e) => setFilter(e.target.value)}
+
+            >
+
+              <option value="Semua">All Subjects</option>
+
+              {daftarMK.map(mk => <option key={mk} value={mk}>{mk}</option>)}
+
+            </select>
+
+          </div>
+
+        </div>
+
+
+
+        {loading ? (
+
+          <div className="py-32 flex flex-col items-center justify-center gap-5 text-zinc-400 font-serif italic">
+
+            <Loader2 className="animate-spin text-[#D4AF37]" size={28} />
+
+            <span className="tracking-[0.3em] uppercase text-[10px] font-bold">Accessing Archive...</span>
+
+          </div>
+
+        ) : (
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+
+            {filteredMateri.map((m) => (
+
+              <InteractiveCard key={m.id}>
+
+                <div className="bg-white p-10 rounded-[40px] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] flex flex-col justify-between h-full border border-zinc-100 hover:shadow-[0_30px_70px_-10px_rgba(212,175,55,0.12)] transition-all duration-500 group relative overflow-hidden">
+
+                 
+
+                  {/* Subject Badge */}
+
+                  <div>
+
+                    <div className="flex items-center gap-3 mb-6">
+
+                      <div className="h-2 w-2 rounded-full bg-[#D4AF37]"></div>
+
+                      <span className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">
+
+                        {m.mk_nama}
+
+                      </span>
+
+                    </div>
+
+
+
+                    <h2 className="text-2xl font-serif text-zinc-900 tracking-tight leading-tight group-hover:text-black transition-colors mb-8">
+
+                      {m.judul}
+
+                    </h2>
+
+                  </div>
+
+
+
+                  {/* Elegant Button */}
+
+                  <a
+
+                    href={m.file_url}
+
+                    target="_blank"
+
+                    rel="noopener noreferrer"
+
+                    className="mt-4 flex items-center justify-between group/btn"
+
+                  >
+
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37] border-b border-[#D4AF37]/20 pb-1 group-hover/btn:border-[#D4AF37] transition-all">
+
+                      Review File
+
+                    </span>
+
+                    <div className="p-3 rounded-full bg-black text-[#D4AF37] group-hover/btn:translate-x-2 transition-transform duration-300">
+
+                      <ChevronRight size={16} />
+
+                    </div>
+
+                  </a>
+
+
+
+                  {/* Watermark-like Icon */}
+
+                  <div className="absolute -right-4 -bottom-4 opacity-[0.03] text-black group-hover:opacity-[0.07] transition-opacity">
+
+                    <FileText size={120} />
+
+                  </div>
+
+                </div>
+
+              </InteractiveCard>
+
+            ))}
+
+          </div>
+
+        )}
+
+
+
+        {!loading && filteredMateri.length === 0 && (
+
+          <div className="py-32 text-center opacity-30 italic font-serif text-zinc-400 tracking-widest text-sm">
+
+            No materials found in this category.
+
+          </div>
+
+        )}
+
+      </main>
+
+
+
+      {/* Aesthetic Footer */}
+
+      <footer className="text-center py-12 opacity-40">
+
+        <div className="h-[1px] w-20 bg-[#D4AF37] mx-auto mb-6"></div>
+
+        <p className="text-[9px] uppercase tracking-[0.4em] font-bold text-zinc-500">
+
+          ZORA Academic Resource Division
+
+        </p>
+
+      </footer>
+
+    </div>
+
+  );
+
 }

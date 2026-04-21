@@ -1,361 +1,191 @@
 "use client";
 
+import React, { useState, useRef } from "react";
+import SignatureCanvas from "react-signature-canvas";
+import { createClient } from "@/utils/supabase/client"; // Pastikan path ini sesuai dengan project Next.js kamu
 
-
-import React, { useState, useEffect } from 'react';
-
-import { createClient } from '@/utils/supabase/client';
-
-import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
-
-import { FileText, Search, Loader2, ChevronRight } from 'lucide-react';
-
-
-
-// --- KOMPONEN INTERAKTIF (PREMIUM 3D EFFECT) ---
-
-function InteractiveCard({ children }: { children: React.ReactNode }) {
-
-  const x = useMotionValue(0);
-
-  const y = useMotionValue(0);
-
-  const mouseXSpring = useSpring(x);
-
-  const mouseYSpring = useSpring(y);
-
-  const rotateX = useTransform(mouseYSpring, [-100, 100], [7, -7]);
-
-  const rotateY = useTransform(mouseXSpring, [-100, 100], [-7, 7]);
-
-
-
-  function handleMouseMove(event: React.MouseEvent<HTMLDivElement>) {
-
-    const rect = event.currentTarget.getBoundingClientRect();
-
-    const centerX = rect.left + rect.width / 2;
-
-    const centerY = rect.top + rect.height / 2;
-
-    x.set(event.clientX - centerX);
-
-    y.set(event.clientY - centerY);
-
-  }
-
-
-
-  function handleMouseLeave() {
-
-    x.set(0);
-
-    y.set(0);
-
-  }
-
-
-
-  return (
-
-    <motion.div
-
-      style={{ perspective: 1200, rotateX, rotateY }}
-
-      onMouseMove={handleMouseMove}
-
-      onMouseLeave={handleMouseLeave}
-
-      className="w-full h-full"
-
-    >
-
-      {children}
-
-    </motion.div>
-
-  );
-
-}
-
-
-
-interface Materi {
-
-  id: string;
-
-  judul: string;
-
-  mk_nama: string;
-
-  file_url: string;
-
-}
-
-
-
-export default function MateriPage() {
-
-  const [materiList, setMateriList] = useState<Materi[]>([]);
-
-  const [filter, setFilter] = useState('Semua');
-
-  const [loading, setLoading] = useState(true);
-
- 
-
+const SuratIzinMahasiswa = () => {
   const supabase = createClient();
+  const [loading, setLoading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
 
+  const [formData, setFormData] = useState({
+    namaMatkul: "",
+    namaLengkap: "",
+    npm: "",
+    prodi: "Agroteknologi",
+    fakultas: "Pertanian",
+    tanggal: "",
+    alasan: "",
+    namaWali: "",
+  });
 
+  // Refs untuk Signature Pad
+  const sigPadMhs = useRef<SignatureCanvas>(null);
+  const sigPadOrtu = useRef<SignatureCanvas>(null);
 
-  useEffect(() => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
-    async function fetchData() {
+  const clearSignature = (type: "mhs" | "ortu") => {
+    if (type === "mhs") sigPadMhs.current?.clear();
+    else sigPadOrtu.current?.clear();
+  };
 
-      try {
-
-        setLoading(true);
-
-        const { data, error } = await supabase
-
-          .from('materi')
-
-          .select('*')
-
-          .order('created_at', { ascending: false });
-
-       
-
-        if (data) setMateriList(data as Materi[]);
-
-      } catch (err) {
-
-        console.error("Error:", err);
-
-      } finally {
-
-        setLoading(false);
-
-      }
-
+  const handleSubmit = async () => {
+    // Validasi Sederhana
+    if (!formData.namaLengkap || !formData.npm || !formData.namaMatkul) {
+      return alert("Mohon lengkapi Nama, NPM, dan Mata Kuliah!");
+    }
+    if (sigPadMhs.current?.isEmpty() || sigPadOrtu.current?.isEmpty()) {
+      return alert("Tanda tangan Mahasiswa dan Wali wajib diisi!");
     }
 
-    fetchData();
+    setLoading(true);
 
-  }, [supabase]);
+    try {
+      // 1. Ambil data TTD sebagai Base64 String
+      const ttdMhsBase64 = sigPadMhs.current!.getTrimmedCanvas().toDataURL("image/png");
+      const ttdOrtuBase64 = sigPadOrtu.current!.getTrimmedCanvas().toDataURL("image/png");
 
+      let lampiranUrl = "";
 
+      // 2. Upload Lampiran ke Supabase Storage (jika ada)
+      if (file) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_bukti.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('uploads') // Pastikan nama bucket di Supabase adalah 'uploads'
+          .upload(fileName, file);
 
-  const daftarMK = Array.from(new Set(materiList.map(m => m.mk_nama)));
+        if (uploadError) throw uploadError;
 
-  const filteredMateri = filter === 'Semua' ? materiList : materiList.filter(m => m.mk_nama === filter);
+        const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(fileName);
+        lampiranUrl = urlData.publicUrl;
+      }
 
+      // 3. Insert ke Tabel perizinan (Menyesuaikan kolom tabelmu)
+      const { error } = await supabase.from('perizinan').insert([{
+        nama_lengkap: formData.namaLengkap,
+        npm: formData.npm,
+        mk_nama: formData.namaMatkul,
+        alasan: formData.alasan,
+        nama_wali: formData.namaWali,
+        prodi: formData.prodi,
+        fakultas: formData.fakultas,
+        tgl_izin: formData.tanggal,
+        tanda_tangan_url: ttdMhsBase64,   // TTD Mahasiswa disimpan di sini
+        surat_dokter_url: ttdOrtuBase64,   // TTD Wali disimpan di sini
+        file_pdf_url: lampiranUrl        // URL Lampiran foto/bukti
+      }]);
 
+      if (error) throw error;
+
+      alert("Berhasil! Data perizinan telah dikirim ke Admin.");
+      
+      // Reset form
+      setFormData({ ...formData, namaMatkul: "", alasan: "", tanggal: "" });
+      setFile(null);
+      sigPadMhs.current?.clear();
+      sigPadOrtu.current?.clear();
+
+    } catch (err: any) {
+      console.error(err);
+      alert("Gagal mengirim data: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-
-    <div className="min-h-screen bg-[#fafafa] lg:ml-64 transition-all pb-32 font-sans relative">
-
-     
-
-      {/* Cinematic Header (ZORA Style) */}
-
-      <header className="bg-black text-white p-20 border-b border-[#D4AF37]/20 shadow-2xl relative overflow-hidden">
-
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#1a1a1a_0%,_#000000_100%)] opacity-80"></div>
-
-        <div className="max-w-6xl mx-auto relative z-10 flex flex-col items-center text-center">
-
-          <div className="flex items-center gap-4 mb-4">
-
-             <div className="h-[1px] w-12 bg-[#D4AF37]"></div>
-
-             <p className="text-[#D4AF37] uppercase tracking-[0.5em] text-[10px] font-bold">Academic Resources</p>
-
-             <div className="h-[1px] w-12 bg-[#D4AF37]"></div>
-
-          </div>
-
-          <h1 className="text-5xl md:text-6xl font-serif tracking-tight text-white uppercase italic leading-tight">
-
-            Lecture <span className="text-[#D4AF37] not-italic font-light tracking-[0.1em]">Materials</span>
-
-          </h1>
-
+    <div className="p-4 md:p-10 bg-slate-100 min-h-screen text-slate-900 font-sans">
+      <div className="max-w-2xl mx-auto bg-white p-6 md:p-10 rounded-[30px] shadow-xl border border-slate-200">
+        
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-black text-[#800020] uppercase tracking-tight">Form Perizinan Kuliah</h1>
+          <p className="text-xs font-bold text-slate-400 mt-1">Lengkapi data untuk dikonfirmasi oleh Admin</p>
         </div>
 
-      </header>
-
-
-
-      {/* Content Area */}
-
-      <main className="p-8 md:p-16 max-w-6xl mx-auto -mt-16 relative z-20">
-
-       
-
-        {/* Filter Section (Elegant & Minimal) */}
-
-        <div className="flex justify-center mb-16">
-
-          <div className="bg-white p-2 rounded-full shadow-xl border border-zinc-100 flex items-center gap-2 max-w-md w-full">
-
-            <div className="pl-6 text-[#D4AF37]">
-
-              <Search size={18} />
-
+        <div className="space-y-5">
+          {/* Baris 1: Nama & NPM */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase ml-1">Nama Mahasiswa</label>
+              <input name="namaLengkap" placeholder="Contoh: Budi Santoso" className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.namaLengkap} />
             </div>
-
-            <select
-
-              className="w-full bg-transparent p-4 rounded-full font-bold text-[10px] uppercase tracking-widest text-zinc-500 outline-none cursor-pointer appearance-none"
-
-              onChange={(e) => setFilter(e.target.value)}
-
-            >
-
-              <option value="Semua">All Subjects</option>
-
-              {daftarMK.map(mk => <option key={mk} value={mk}>{mk}</option>)}
-
-            </select>
-
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase ml-1">NPM</label>
+              <input name="npm" placeholder="Masukkan NPM" className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.npm} />
+            </div>
           </div>
 
+          {/* Baris 2: Matkul & Wali */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase ml-1">Mata Kuliah</label>
+              <input name="namaMatkul" placeholder="Nama MK" className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.namaMatkul} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase ml-1">Nama Orang Tua/Wali</label>
+              <input name="namaWali" placeholder="Nama Pendamping" className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.namaWali} />
+            </div>
+          </div>
+
+          {/* Baris 3: Tanggal & Upload */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase ml-1">Tanggal Izin</label>
+              <input name="tanggal" type="date" className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.tanggal} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase ml-1">Lampiran Bukti (Foto)</label>
+              <input type="file" accept="image/*" className="w-full border-2 p-2 rounded-2xl text-xs bg-slate-50" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase ml-1">Alasan Tidak Mengikuti Kuliah</label>
+            <textarea name="alasan" rows={3} placeholder="Contoh: Sakit demam/Acara keluarga..." className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.alasan} />
+          </div>
+
+          {/* AREA TANDA TANGAN (Sangat Penting untuk HP) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-blue-600 flex justify-between">
+                Tanda Tangan Wali <button onClick={() => clearSignature('ortu')} className="text-red-500 lowercase font-normal italic">[hapus]</button>
+              </label>
+              <div className="border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50 overflow-hidden touch-none">
+                <SignatureCanvas ref={sigPadOrtu} penColor="black" canvasProps={{ className: "w-full h-32" }} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-blue-600 flex justify-between">
+                Tanda Tangan Mahasiswa <button onClick={() => clearSignature('mhs')} className="text-red-500 lowercase font-normal italic">[hapus]</button>
+              </label>
+              <div className="border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50 overflow-hidden touch-none">
+                <SignatureCanvas ref={sigPadMhs} penColor="black" canvasProps={{ className: "w-full h-32" }} />
+              </div>
+            </div>
+          </div>
         </div>
 
-
-
-        {loading ? (
-
-          <div className="py-32 flex flex-col items-center justify-center gap-5 text-zinc-400 font-serif italic">
-
-            <Loader2 className="animate-spin text-[#D4AF37]" size={28} />
-
-            <span className="tracking-[0.3em] uppercase text-[10px] font-bold">Accessing Archive...</span>
-
-          </div>
-
-        ) : (
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-
-            {filteredMateri.map((m) => (
-
-              <InteractiveCard key={m.id}>
-
-                <div className="bg-white p-10 rounded-[40px] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] flex flex-col justify-between h-full border border-zinc-100 hover:shadow-[0_30px_70px_-10px_rgba(212,175,55,0.12)] transition-all duration-500 group relative overflow-hidden">
-
-                 
-
-                  {/* Subject Badge */}
-
-                  <div>
-
-                    <div className="flex items-center gap-3 mb-6">
-
-                      <div className="h-2 w-2 rounded-full bg-[#D4AF37]"></div>
-
-                      <span className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">
-
-                        {m.mk_nama}
-
-                      </span>
-
-                    </div>
-
-
-
-                    <h2 className="text-2xl font-serif text-zinc-900 tracking-tight leading-tight group-hover:text-black transition-colors mb-8">
-
-                      {m.judul}
-
-                    </h2>
-
-                  </div>
-
-
-
-                  {/* Elegant Button */}
-
-                  <a
-
-                    href={m.file_url}
-
-                    target="_blank"
-
-                    rel="noopener noreferrer"
-
-                    className="mt-4 flex items-center justify-between group/btn"
-
-                  >
-
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37] border-b border-[#D4AF37]/20 pb-1 group-hover/btn:border-[#D4AF37] transition-all">
-
-                      Review File
-
-                    </span>
-
-                    <div className="p-3 rounded-full bg-black text-[#D4AF37] group-hover/btn:translate-x-2 transition-transform duration-300">
-
-                      <ChevronRight size={16} />
-
-                    </div>
-
-                  </a>
-
-
-
-                  {/* Watermark-like Icon */}
-
-                  <div className="absolute -right-4 -bottom-4 opacity-[0.03] text-black group-hover:opacity-[0.07] transition-opacity">
-
-                    <FileText size={120} />
-
-                  </div>
-
-                </div>
-
-              </InteractiveCard>
-
-            ))}
-
-          </div>
-
-        )}
-
-
-
-        {!loading && filteredMateri.length === 0 && (
-
-          <div className="py-32 text-center opacity-30 italic font-serif text-zinc-400 tracking-widest text-sm">
-
-            No materials found in this category.
-
-          </div>
-
-        )}
-
-      </main>
-
-
-
-      {/* Aesthetic Footer */}
-
-      <footer className="text-center py-12 opacity-40">
-
-        <div className="h-[1px] w-20 bg-[#D4AF37] mx-auto mb-6"></div>
-
-        <p className="text-[9px] uppercase tracking-[0.4em] font-bold text-zinc-500">
-
-          ZORA Academic Resource Division
-
+        <button 
+          onClick={handleSubmit} 
+          disabled={loading}
+          className={`w-full mt-10 py-5 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-[#800020] text-white hover:bg-black'}`}
+        >
+          {loading ? "Sedang Mengirim..." : "Kirim Perizinan"}
+        </button>
+
+        <p className="text-center text-[9px] text-slate-400 mt-6 font-bold uppercase">
+          Setelah dikirim, Admin akan meninjau dan mencetak surat anda dalam format PDF.
         </p>
-
-      </footer>
-
+      </div>
     </div>
-
   );
+};
 
-}
+export default SuratIzinMahasiswa;

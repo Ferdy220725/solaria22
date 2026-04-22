@@ -224,7 +224,7 @@ export default function Dashboard() {
                       <div key={zoom.id} className="p-4 bg-slate-50 rounded-3xl border-2 border-slate-100">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="text-[9px] font-black text-slate-400 uppercase">{zoom.mk_nama || 'UMUM'}</p>
+                            <p className="text-[9px] font-black text-slate-400 uppercase">{zoom.mk_nama || 'AGENDA'}</p>
                             <h4 className="font-black text-slate-800 text-sm uppercase leading-tight">{zoom.judul}</h4>
                           </div>
                           <span className="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-1 rounded-lg">
@@ -285,7 +285,7 @@ export default function Dashboard() {
                     </div>
                   ) : isMepet(t.deadline) && activeTab === 'perlu dikerjakan' && (
                     <div className="bg-red-600 text-white text-[9px] font-black py-1 px-3 rounded-md self-start uppercase tracking-widest animate-bounce">
-                      SANGAT MEPET! SEGERA SELESAIKAN!
+                      DEADLINE MEPET! SEGERA SELESAIKAN!
                     </div>
                   )}
 
@@ -294,7 +294,7 @@ export default function Dashboard() {
                   {t.deskripsi && (
                     <details className="group cursor-pointer">
                       <summary className="text-[10px] font-black text-[#004d40] uppercase tracking-widest list-none flex items-center gap-1 group-open:mb-3">
-                        {activeTab === 'sudah selesai' ? '' : '📂 Lihat Deskripsi Tugas [+ ]'}
+                        {activeTab === 'sudah selesai' ? '' : 'Baca Selengkapnya...'}
                       </summary>
                       <div className="p-5 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
                         <p className="text-[13px] text-slate-700 font-medium leading-relaxed whitespace-pre-line">{t.deskripsi}</p>

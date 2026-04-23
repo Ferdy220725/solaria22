@@ -224,7 +224,7 @@ export default function Dashboard() {
                       <div key={zoom.id} className="p-4 bg-slate-50 rounded-3xl border-2 border-slate-100">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="text-[9px] font-black text-slate-400 uppercase">{zoom.mk_nama || 'AGENDA'}</p>
+                            <p className="text-[9px] font-black text-slate-400 uppercase">{zoom.mk_nama || 'MATA KULIAH'}</p>
                             <h4 className="font-black text-slate-800 text-sm uppercase leading-tight">{zoom.judul}</h4>
                           </div>
                           <span className="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-1 rounded-lg">

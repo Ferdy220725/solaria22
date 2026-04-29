@@ -30,6 +30,8 @@ export default function SuperAdminPage() {
   const [golongan, setGolongan] = useState('C1');
   const [linkPrak, setLinkPrak] = useState('');
   const [deadlinePrak, setDeadlinePrak] = useState('');
+  // Tambahan state untuk Praktikum agar sinkron dengan database
+  const [deskripsiPrak, setDeskripsiPrak] = useState(''); 
   
   const [judulKuliah, setJudulKuliah] = useState('');
   const [mkKuliah, setMkKuliah] = useState('');
@@ -157,13 +159,16 @@ export default function SuperAdminPage() {
       mk_nama: mkPrak.trim().toUpperCase(),
       golongan: golongan.trim().toUpperCase(),
       deadline: formatToWIB(deadlinePrak),
-      link_pengumpulan: linkPrak.trim()
+      deskripsi: deskripsiPrak.trim(), // Logika baru ditambahkan
+      link_pengumpulan: linkPrak.trim() // Logika baru ditambahkan
     }]);
 
     if (!error) {
       await sendNotification("🔬 Tugas Praktikum Baru", `${mkPrak}: ${judulPrak.trim()} (GOL ${golongan})`, "tugas_praktikum");
       alert("Tugas Praktikum Terbit!");
       setJudulPrak('');
+      setLinkPrak(''); // Reset input link
+      setDeskripsiPrak(''); // Reset input deskripsi
       fetchData();
     }
   };
@@ -321,6 +326,7 @@ export default function SuperAdminPage() {
               <button onClick={handlePostTugasKuliah} className="w-full bg-[#004d40] text-white py-3 rounded-xl font-black text-xs shadow-md">PUBLISH</button>
             </div>
 
+            {/* BAGIAN PRAKTIKUM (LOGIKA DITAMBAHKAN DI SINI) */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#D4AF37]">
               <h2 className="font-black mb-4 text-[#800020] uppercase text-xs">2. Post Praktikum</h2>
               <select className="w-full border p-3 mb-2 rounded-xl text-xs font-bold text-black" value={mkPrak} onChange={e => {setMkPrak(e.target.value); setGolongan(e.target.value === 'DIT' ? 'B1' : 'C1');}}>
@@ -330,7 +336,12 @@ export default function SuperAdminPage() {
                 {mkPrak === 'DIT' ? (<><option value="B1">GOL B1</option><option value="B3">GOL B3</option><option value="C3">GOL C3</option></>) : (<><option value="C1">GOL C1</option><option value="C2">GOL C2</option><option value="C3">GOL C3</option></>)}
               </select>
               <input type="text" placeholder="Judul" className="w-full border p-3 mb-2 rounded-xl text-xs text-black" value={judulPrak} onChange={e => setJudulPrak(e.target.value)} />
-              <input type="datetime-local" className="w-full border p-3 mb-4 rounded-xl text-xs text-black" value={deadlinePrak} onChange={e => setDeadlinePrak(e.target.value)} />
+              <input type="datetime-local" className="w-full border p-3 mb-2 rounded-xl text-xs text-black" value={deadlinePrak} onChange={e => setDeadlinePrak(e.target.value)} />
+              
+              {/* Input Baru untuk Deskripsi dan Link Praktikum */}
+              <input type="text" placeholder="Link Pengumpulan" className="w-full border p-3 mb-2 rounded-xl text-xs bg-yellow-50 text-black" value={linkPrak} onChange={e => setLinkPrak(e.target.value)} />
+              <textarea placeholder="Deskripsi Praktikum..." className="w-full border p-3 mb-4 rounded-xl text-xs min-h-[80px] text-black" value={deskripsiPrak} onChange={e => setDeskripsiPrak(e.target.value)} />
+              
               <button onClick={handlePostTugasPrak} className="w-full bg-[#D4AF37] text-white py-3 rounded-xl font-black text-xs shadow-md">PUBLISH</button>
             </div>
 

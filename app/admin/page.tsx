@@ -17,11 +17,12 @@ export default function SuperAdminPage() {
   const [absensiEnabled, setAbsensiEnabled] = useState(false);
   const [kodeAbsen, setKodeAbsen] = useState('');
 
-  // --- STATE BARU: ZOOM (UPDATED FOR TIME-LOCK) ---
+  // --- STATE BARU: ZOOM (UPDATED FOR SERVER-SIDE AUTO DELETE) ---
   const [zoomMeetings, setZoomMeetings] = useState<any[]>([]);
   const [zoomJudul, setZoomJudul] = useState('');
   const [zoomLink, setZoomLink] = useState('');
-  const [zoomWaktu, setZoomWaktu] = useState(''); // Tambahan State Waktu
+  const [zoomWaktu, setZoomWaktu] = useState(''); 
+  const [zoomWaktuSelesai, setZoomWaktuSelesai] = useState(''); // State Baru untuk Waktu Selesai
   const [zoomActive, setZoomActive] = useState(false);
 
   // --- STATE INPUT ---
@@ -30,7 +31,6 @@ export default function SuperAdminPage() {
   const [golongan, setGolongan] = useState('C1');
   const [linkPrak, setLinkPrak] = useState('');
   const [deadlinePrak, setDeadlinePrak] = useState('');
-  // Tambahan state untuk Praktikum agar sinkron dengan database
   const [deskripsiPrak, setDeskripsiPrak] = useState(''); 
   
   const [judulKuliah, setJudulKuliah] = useState('');
@@ -57,9 +57,10 @@ export default function SuperAdminPage() {
       const { data: dPrak } = await supabase.from('tugas_praktikum').select('*').order('deadline', { ascending: true });
       const { data: dKuliah } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
       
-      // Ambil List Zoom
-      const { data: dZoom } = await supabase.from('zoom_meetings').select('*').order('waktu_mulai', { ascending: true });
-      if (dZoom) setZoomMeetings(dZoom);
+      // --- LOGIKA ZOOM (DATABASE CRON ENABLED) ---
+      // Kita hanya perlu mengambil data saja, logika hapus sudah ditangani SQL Cron di Server.
+      const { data: dZoomRaw } = await supabase.from('zoom_meetings').select('*').order('waktu_mulai', { ascending: true });
+      if (dZoomRaw) setZoomMeetings(dZoomRaw);
 
       if (dIzin) setIzins(dIzin);
       
@@ -108,21 +109,24 @@ export default function SuperAdminPage() {
       }]);
   };
 
-  // --- HANDLER ZOOM (INTEGRATED WITH WAKTU_MULAI) ---
+  // --- HANDLER ZOOM (INTEGRATED WITH WAKTU_SELESAI) ---
   const handleAddZoom = async () => {
-    if (!zoomJudul || !zoomLink || !zoomWaktu) return alert("Isi Judul, Link, & Waktu Zoom!");
+    if (!zoomJudul || !zoomLink || !zoomWaktu || !zoomWaktuSelesai) {
+      return alert("Isi Judul, Link, Waktu Mulai & Selesai!");
+    }
     
     const { error } = await supabase.from('zoom_meetings').insert([{
       judul: zoomJudul.trim(),
       link: zoomLink.trim(),
       waktu_mulai: formatToWIB(zoomWaktu),
+      waktu_selesai: formatToWIB(zoomWaktuSelesai), // Mengirim waktu selesai ke Supabase
       is_active: true,
     }]);
 
     if (!error) {
       await sendNotification("🎥 Jadwal Zoom Baru", `${zoomJudul}`, "zoom");
       alert("Jadwal Zoom Berhasil Ditambahkan!");
-      setZoomJudul(''); setZoomLink(''); setZoomWaktu('');
+      setZoomJudul(''); setZoomLink(''); setZoomWaktu(''); setZoomWaktuSelesai('');
       fetchData();
     } else {
       alert("Gagal: " + error.message);
@@ -159,16 +163,16 @@ export default function SuperAdminPage() {
       mk_nama: mkPrak.trim().toUpperCase(),
       golongan: golongan.trim().toUpperCase(),
       deadline: formatToWIB(deadlinePrak),
-      deskripsi: deskripsiPrak.trim(), // Logika baru ditambahkan
-      link_pengumpulan: linkPrak.trim() // Logika baru ditambahkan
+      deskripsi: deskripsiPrak.trim(),
+      link_pengumpulan: linkPrak.trim()
     }]);
 
     if (!error) {
       await sendNotification("🔬 Tugas Praktikum Baru", `${mkPrak}: ${judulPrak.trim()} (GOL ${golongan})`, "tugas_praktikum");
       alert("Tugas Praktikum Terbit!");
       setJudulPrak('');
-      setLinkPrak(''); // Reset input link
-      setDeskripsiPrak(''); // Reset input deskripsi
+      setLinkPrak(''); 
+      setDeskripsiPrak(''); 
       fetchData();
     }
   };
@@ -275,25 +279,29 @@ export default function SuperAdminPage() {
       {role === 'WEB' ? (
         <div className="space-y-10">
           
-          {/* MANAJEMEN ZOOM (UPDATED: MULTI-SCHEDULE) */}
+          {/* MANAJEMEN ZOOM (UPDATED: SERVER-SIDE AUTO DELETE) */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-[35px] shadow-lg text-white border-b-8 border-blue-900">
             <h2 className="font-black mb-4 uppercase text-xs flex items-center gap-2"><span>🎥</span> KONTROL JADWAL ZOOM MEETING</h2>
-            <div className="grid md:grid-cols-5 gap-4 items-end mb-6">
-               <div className="md:col-span-1">
-                  <p className="text-[9px] font-black uppercase mb-1 opacity-70">Mata Kuliah</p>
-                  <input type="text" placeholder="Genetik Tanaman" className="w-full p-3 rounded-xl text-xs text-slate-900 font-bold" value={zoomJudul} onChange={e => setZoomJudul(e.target.value)} />
-               </div>
-               <div className="md:col-span-1">
-                  <p className="text-[9px] font-black uppercase mb-1 opacity-70">Link Zoom</p>
-                  <input type="text" placeholder="https://..." className="w-full p-3 rounded-xl text-xs text-slate-900 font-bold" value={zoomLink} onChange={e => setZoomLink(e.target.value)} />
-               </div>
-               <div className="md:col-span-1">
-                  <p className="text-[9px] font-black uppercase mb-1 opacity-70">Waktu Mulai</p>
-                  <input type="datetime-local" className="w-full p-3 rounded-xl text-xs text-slate-900 font-bold" value={zoomWaktu} onChange={e => setZoomWaktu(e.target.value)} />
-               </div>
-               <div className="md:col-span-2">
-                  <button onClick={handleAddZoom} className="w-full bg-white text-blue-700 py-3 rounded-xl font-black text-xs shadow-xl">TAMBAHKAN JADWAL</button>
-               </div>
+            <div className="grid md:grid-cols-6 gap-4 items-end mb-6">
+                <div className="md:col-span-1">
+                   <p className="text-[9px] font-black uppercase mb-1 opacity-70">Mata Kuliah</p>
+                   <input type="text" placeholder="Genetik Tanaman" className="w-full p-3 rounded-xl text-xs text-slate-900 font-bold" value={zoomJudul} onChange={e => setZoomJudul(e.target.value)} />
+                </div>
+                <div className="md:col-span-1">
+                   <p className="text-[9px] font-black uppercase mb-1 opacity-70">Link Zoom</p>
+                   <input type="text" placeholder="https://..." className="w-full p-3 rounded-xl text-xs text-slate-900 font-bold" value={zoomLink} onChange={e => setZoomLink(e.target.value)} />
+                </div>
+                <div className="md:col-span-1">
+                   <p className="text-[9px] font-black uppercase mb-1 opacity-70">Waktu Mulai</p>
+                   <input type="datetime-local" className="w-full p-3 rounded-xl text-xs text-slate-900 font-bold" value={zoomWaktu} onChange={e => setZoomWaktu(e.target.value)} />
+                </div>
+                <div className="md:col-span-1">
+                   <p className="text-[9px] font-black uppercase mb-1 opacity-70">Waktu Selesai (Hapus)</p>
+                   <input type="datetime-local" className="w-full p-3 rounded-xl text-xs text-slate-900 font-bold" value={zoomWaktuSelesai} onChange={e => setZoomWaktuSelesai(e.target.value)} />
+                </div>
+                <div className="md:col-span-2">
+                   <button onClick={handleAddZoom} className="w-full bg-white text-blue-700 py-3 rounded-xl font-black text-xs shadow-xl">TAMBAHKAN JADWAL</button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -301,7 +309,8 @@ export default function SuperAdminPage() {
                 <div key={z.id} className="bg-white/10 p-4 rounded-2xl flex justify-between items-center border border-white/20">
                   <div>
                     <p className="text-[10px] font-black uppercase">{z.judul}</p>
-                    <p className="text-[8px] opacity-60 font-bold">{new Date(z.waktu_mulai).toLocaleString('id-ID')}</p>
+                    <p className="text-[8px] opacity-60 font-bold">Mulai: {new Date(z.waktu_mulai).toLocaleString('id-ID')}</p>
+                    <p className="text-[8px] text-red-300 font-bold italic">Hapus: {new Date(z.waktu_selesai).toLocaleString('id-ID')}</p>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => toggleZoomStatus(z.id, !z.is_active)} className={`p-2 rounded-lg text-[8px] font-black ${z.is_active ? 'bg-green-400 text-green-900' : 'bg-slate-400 text-slate-800'}`}>
@@ -315,7 +324,6 @@ export default function SuperAdminPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {/* Form Input Sesuai Kode Asli */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#004d40]">
               <h2 className="font-black mb-4 text-[#004d40] uppercase text-xs">1. Post Tugas Kuliah</h2>
               <input type="text" placeholder="Matkul" className="w-full border p-3 mb-2 rounded-xl text-xs text-black" value={mkKuliah} onChange={e => setMkKuliah(e.target.value)} />
@@ -326,7 +334,6 @@ export default function SuperAdminPage() {
               <button onClick={handlePostTugasKuliah} className="w-full bg-[#004d40] text-white py-3 rounded-xl font-black text-xs shadow-md">PUBLISH</button>
             </div>
 
-            {/* BAGIAN PRAKTIKUM (LOGIKA DITAMBAHKAN DI SINI) */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#D4AF37]">
               <h2 className="font-black mb-4 text-[#800020] uppercase text-xs">2. Post Praktikum</h2>
               <select className="w-full border p-3 mb-2 rounded-xl text-xs font-bold text-black" value={mkPrak} onChange={e => {setMkPrak(e.target.value); setGolongan(e.target.value === 'DIT' ? 'B1' : 'C1');}}>
@@ -337,11 +344,8 @@ export default function SuperAdminPage() {
               </select>
               <input type="text" placeholder="Judul" className="w-full border p-3 mb-2 rounded-xl text-xs text-black" value={judulPrak} onChange={e => setJudulPrak(e.target.value)} />
               <input type="datetime-local" className="w-full border p-3 mb-2 rounded-xl text-xs text-black" value={deadlinePrak} onChange={e => setDeadlinePrak(e.target.value)} />
-              
-              {/* Input Baru untuk Deskripsi dan Link Praktikum */}
               <input type="text" placeholder="Link Pengumpulan" className="w-full border p-3 mb-2 rounded-xl text-xs bg-yellow-50 text-black" value={linkPrak} onChange={e => setLinkPrak(e.target.value)} />
               <textarea placeholder="Deskripsi Praktikum..." className="w-full border p-3 mb-4 rounded-xl text-xs min-h-[80px] text-black" value={deskripsiPrak} onChange={e => setDeskripsiPrak(e.target.value)} />
-              
               <button onClick={handlePostTugasPrak} className="w-full bg-[#D4AF37] text-white py-3 rounded-xl font-black text-xs shadow-md">PUBLISH</button>
             </div>
 
@@ -354,7 +358,6 @@ export default function SuperAdminPage() {
             </div>
           </div>
 
-          {/* List Data Aktif (Tugas & Izin) sesuai kode asli */}
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
               <h3 className="font-black text-xs uppercase mb-4 text-slate-400">Daftar Tugas Aktif</h3>
@@ -395,7 +398,6 @@ export default function SuperAdminPage() {
           </div>
         </div>
       ) : (
-        /* UI ABSENSI SESUAI KODE ASLI */
         <div className="space-y-6">
           <div className="grid md:grid-cols-2 gap-6">
              <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-blue-600">

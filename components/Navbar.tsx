@@ -1,7 +1,16 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, FlaskConical, FileText, UserCog, Menu, X } from "lucide-react"; 
+import { 
+  LayoutDashboard, 
+  BookOpen, 
+  FlaskConical, 
+  FileText, 
+  UserCog, 
+  Menu, 
+  X, 
+  Sprout // Import icon baru untuk Pertanian Perkotaan
+} from "lucide-react"; 
 import { useEffect, useState } from "react";
 
 export default function Navbar() {
@@ -29,6 +38,14 @@ export default function Navbar() {
     { id: "m1", name: "Home", href: "/", icon: <LayoutDashboard size={20} /> },
     { id: "m2", name: "Materi", href: "/materi", icon: <BookOpen size={20} /> },
     { id: "m3", name: "Praktikum", href: "/praktikum", icon: <FlaskConical size={20} /> },
+    // LOGIKA BARU: Penambahan menu Projek Pertanian Perkotaan (Eksternal)
+    { 
+      id: "m_ext", 
+      name: "Pertanian Perkotaan", 
+      href: "https://pertanian-perkotaan-c.vercel.app/", 
+      icon: <Sprout size={20} />,
+      isExternal: true 
+    },
     { id: "m4", name: "Izin", href: "/perizinan", icon: <FileText size={20} /> },
     { id: "m5", name: "Admin", href: "/admin", icon: <UserCog size={20} /> },
   ];
@@ -45,6 +62,9 @@ export default function Navbar() {
             key={item.id}
             href={item.href}
             onClick={() => setIsOpen(false)}
+            // Tambahkan target="_blank" jika isExternal true agar tidak menutup web utama
+            target={item.isExternal ? "_blank" : undefined}
+            rel={item.isExternal ? "noopener noreferrer" : undefined}
             className={`flex items-center justify-end gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border pointer-events-auto ${
               pathname === item.href 
                 ? "bg-[#800020] text-white border-[#800020]" 
@@ -52,7 +72,7 @@ export default function Navbar() {
             }`}
           >
             <span className="text-[10px] font-black uppercase tracking-widest">{item.name}</span>
-            <div className="bg-slate-50/50 dark:bg-white/5 p-1 rounded-lg text-inherit">
+            <div className={`p-1 rounded-lg text-inherit ${item.isExternal ? "bg-emerald-50 text-emerald-600" : "bg-slate-50/50 dark:bg-white/5"}`}>
                 {item.icon}
             </div>
           </Link>

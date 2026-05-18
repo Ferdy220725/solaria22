@@ -2,73 +2,77 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
 
-// 1. Ambil Kunci VAPID dari Environment Variables
+// 1. Inisialisasi Kunci VAPID untuk Web Push
 const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const privateKey = process.env.VAPID_PRIVATE_KEY;
 
-// Pengaman: setVapidDetails hanya dijalankan jika kedua KEY tersedia dan valid
 if (publicKey && privateKey) {
   try {
     webpush.setVapidDetails('mailto:agrotek@zora.com', publicKey, privateKey);
   } catch (error) {
-    console.error('Gagal inisialisasi VAPID pada saat build:', error);
+    console.error('Gagal inisialisasi VAPID:', error);
   }
 }
 
-// 2. Koneksi Supabase internal
+// 2. Hubungkan ke Supabase menggunakan SERVICE_ROLE_KEY (Bukan Anon Key)
+// Ini penting supaya API bisa membaca tabel zora_notifications tanpa terhalang RLS
 const supabase = createClient(
-  'https://etdcqxdjmdyexbvgjaza.supabase.co',
-  'sb_publishable_69qNJfkxRc2lPnSUMYXCeQ_lsypv2Ba'
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
 export async function POST(request: Request) {
   try {
-    // Validasi darurat jika key ternyata kosong saat runtime API dipanggil
     if (!publicKey || !privateKey) {
-      return NextResponse.json({ error: 'Konfigurasi VAPID tidak ditemukan di server.' }, { status: 500 });
+      return NextResponse.json({ error: 'VAPID Key tidak ditemukan di env Vercel.' }, { status: 500 });
     }
 
-    const body = await request.json();
+    // Mengambil data tugas/jadwal yang baru saja diinput oleh Admin
+    const body = await request.json().catch(() => ({}));
     
-    // Membaca data kiriman dari MonitorJadwal
-    const { nama_tugas, deadline } = body.record; 
+    // Antispasasi jika dipicu lewat Webhook Supabase (body.record) atau fetch biasa (body)
+    const recordData = body.record || body;
+    const nama_tugas = recordData.nama_tugas || "Ada Tugas Baru!";
+    const deadline = recordData.deadline || "Cek aplikasi sekarang";
 
-    // Ambil semua token mahasiswa dari tabel zora_notifications
+    // 3. Ambil semua token browser mahasiswa dari tabel kamu
     const { data: users, error: supabaseError } = await supabase
-      .from('zora_notifications')
+      .from('zora_notifications') // 👈 Memastikan mengambil dari tabel ini
       .select('subscription_json');
 
     if (supabaseError) {
-      console.error('Error mengambil data Supabase:', supabaseError.message);
+      console.error('Gagal mengambil token:', supabaseError.message);
       return NextResponse.json({ error: supabaseError.message }, { status: 500 });
     }
 
     if (!users || users.length === 0) {
-      console.log('Tidak ada token target di tabel zora_notifications');
-      return NextResponse.json({ message: 'Tidak ada token target di database' });
+      return NextResponse.json({ message: 'Tidak ada device terdaftar di zora_notifications.' }, { status: 200 });
     }
 
-    // Format isi pesan baru yang AMAN dari crash format jam/tanggal JavaScript
+    // 4. Bungkus pesan ke format JSON String (Wajib agar sw.js kamu tidak error)
     const payload = JSON.stringify({
-      title: 'Zora: Jadwal Kuliah Baru! 📝',
-      body: `Jadwal: ${nama_tugas}. Tanggal: ${deadline}. Cek aplikasi sekarang!`
+      title: 'Zora: Tugas Baru Dirilis! 📝',
+      body: `Mata Kuliah: ${nama_tugas}. Deadline: ${deadline}.`
     });
 
-    // Kirim notifikasi ke semua perangkat yang terdaftar
+    // 5. Kirim Notifikasi Massal ke seluruh device
     const pushPromises = users.map(user => {
-      // Pastikan data subscription_json ada sebelum ditembak
-      if (user.subscription_json) {
-        return webpush.sendNotification(user.subscription_json, payload)
-          .catch(err => console.error('Token expired atau tidak valid:', err));
-      }
-      return Promise.resolve();
+      if (!user.subscription_json) return Promise.resolve();
+      
+      // Parsing string JSON dari database menjadi objek siap pakai
+      const subJson = typeof user.subscription_json === 'string' 
+        ? JSON.parse(user.subscription_json) 
+        : user.subscription_json;
+
+      return webpush.sendNotification(subJson, payload)
+        .catch(err => console.error('Token kedaluwarsa atau tidak valid:', err.statusCode));
     });
 
     await Promise.all(pushPromises);
+    return NextResponse.json({ success: true, message: 'Notifikasi tugas otomatis terkirim ke mahasiswa!' });
 
-    return NextResponse.json({ success: true, message: 'Notifikasi jadwal otomatis terkirim!' });
   } catch (error: any) {
-    console.error('Crash internal pada API:', error.message);
+    console.error('Crash internal API:', error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -2,13 +2,18 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
 
-// 1. Konfigurasi Web Push pakai Kunci VAPID murni kemarin
-const vapidKeys = {
-  publicKey: 'BFm_5n-0H9N_pXWzLOfu3mKx4j96m8-q-97zL7YF6G-D8_D9J39N_ZzM-f8g_Y6p_gH_vGZ5J7K7L9M0nOpQRSt',
-  privateKey: 'U_G_A_N_D_A_S_A_K_T_I_N_Y_A_Z_O_R_A_C_O_P_I_L_O_T_K_E_R_E_N' // String bypass lokal
-};
+// 1. Ambil Kunci VAPID dari Environment Variables (Lebih Aman & Fleksibel)
+const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const privateKey = process.env.VAPID_PRIVATE_KEY;
 
-webpush.setVapidDetails('mailto:agrotek@zora.com', vapidKeys.publicKey, vapidKeys.privateKey);
+// Pengaman: setVapidDetails hanya dijalankan jika kedua KEY tersedia dan valid
+if (publicKey && privateKey) {
+  try {
+    webpush.setVapidDetails('mailto:agrotek@zora.com', publicKey, privateKey);
+  } catch (error) {
+    console.error('Gagal inisialisasi VAPID pada saat build:', error);
+  }
+}
 
 // 2. Koneksi Supabase internal
 const supabase = createClient(
@@ -18,10 +23,14 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
+    // Validasi darurat jika key ternyata kosong saat runtime API dipanggil
+    if (!publicKey || !privateKey) {
+      return NextResponse.json({ error: 'Konfigurasi VAPID tidak ditemukan di server.' }, { status: 500 });
+    }
+
     const body = await request.json();
     
     // Membaca data tugas yang baru saja kamu input di web
-    // (Asumsi nama kolom di tabel tugasmu adalah 'nama_tugas' dan 'deadline')
     const { nama_tugas, deadline } = body.record; 
 
     // Ambil semua token mahasiswa dari tabel zora_notifications

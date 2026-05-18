@@ -46,7 +46,7 @@ export default function MonitorJadwal() {
         day: today, 
         is_published: false 
       }])
-      .select() // Mengambil data yang baru saja di-insert
+      .select()
 
     if (error) {
       alert("Gagal menambah baris: " + error.message)
@@ -78,18 +78,48 @@ export default function MonitorJadwal() {
     }
   }
 
-  // 5. Fungsi Publikasikan (Luncurkan ke Mahasiswa)
+  // 5. Fungsi Publikasikan (Luncurkan ke Mahasiswa + Kirim Push Notification)
   const publikasikan = async (id: number) => {
+    // Ambil data jadwal spesifik yang mau kita kirim notifikasinya
+    const target = jadwal.find(item => item.id === id)
+    if (!target) return
+
     const { error } = await supabase
       .from('jadwal_kuliah')
       .update({ is_published: true })
       .eq('id', id)
     
     if (!error) {
+      // Update state local agar UI langsung berubah jadi "Live"
       setJadwal(jadwal.map(item => item.id === id ? { ...item, is_published: true } : item))
-      alert('Jadwal berhasil diluncurkan ke kalender mahasiswa!')
+      
+      // ========================================================
+      // 🛠️ PROSES TEMBAK API PUSH NOTIFICATION (SAMBUNGAN KABEL)
+      // ========================================================
+      try {
+        await fetch('/api/send-task-notification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            record: {
+              // Kita manipulasi datanya agar bisa dibaca oleh API task-notification kamu
+              nama_tugas: `${target.subject} (Jam ${target.time} di Ruang ${target.room || 'TBA'})`,
+              deadline: target.day // Mengirimkan tanggal pelaksanaan
+            }
+          })
+        })
+        
+        alert('🚀 BOOM! Jadwal berhasil diluncurkan dan push notification telah dikirim ke semua HP mahasiswa!')
+      } catch (notifError) {
+        console.error("Gagal memicu push notification:", notifError)
+        alert('Jadwal berhasil live di kalender, tetapi push notification gagal menyebar.')
+      }
+      // ========================================================
+
     } else {
-      alert("Gagal mempublikasikan")
+      alert("Gagal mempublikasikan: " + error.message)
     }
   }
 
@@ -98,7 +128,7 @@ export default function MonitorJadwal() {
       <div className="max-w-6xl mx-auto">
         
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 border-b border-[#800020] pb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 border-b border-[#800020]/30 pb-6">
           <div>
             <h1 className="text-3xl font-black text-[#FFD700] tracking-tighter uppercase italic">
               Control Center <span className="text-white/20">/</span> Jadwal

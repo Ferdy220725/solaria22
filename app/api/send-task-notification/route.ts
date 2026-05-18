@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
 
-// 1. Ambil Kunci VAPID dari Environment Variables (Lebih Aman & Fleksibel)
+// 1. Ambil Kunci VAPID dari Environment Variables
 const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const privateKey = process.env.VAPID_PRIVATE_KEY;
 
@@ -30,31 +30,45 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     
-    // Membaca data tugas yang baru saja kamu input di web
+    // Membaca data kiriman dari MonitorJadwal
     const { nama_tugas, deadline } = body.record; 
 
     // Ambil semua token mahasiswa dari tabel zora_notifications
-    const { data: users } = await supabase.from('zora_notifications').select('subscription_json');
+    const { data: users, error: supabaseError } = await supabase
+      .from('zora_notifications')
+      .select('subscription_json');
 
-    if (!users || users.length === 0) {
-      return NextResponse.json({ message: 'Tidak ada token target' });
+    if (supabaseError) {
+      console.error('Error mengambil data Supabase:', supabaseError.message);
+      return NextResponse.json({ error: supabaseError.message }, { status: 500 });
     }
 
-    // Format isi pesan pengingat tugas
+    if (!users || users.length === 0) {
+      console.log('Tidak ada token target di tabel zora_notifications');
+      return NextResponse.json({ message: 'Tidak ada token target di database' });
+    }
+
+    // Format isi pesan baru yang AMAN dari crash format jam/tanggal JavaScript
     const payload = JSON.stringify({
-      title: 'Zora: Tugas Baru Terdeteksi! 📝',
-      body: `Tugas "${nama_tugas}" harus dikumpul pada ${new Date(deadline).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}. Jangan telat!`
+      title: 'Zora: Jadwal Kuliah Baru! 📝',
+      body: `Jadwal: ${nama_tugas}. Tanggal: ${deadline}. Cek aplikasi sekarang!`
     });
 
     // Kirim notifikasi ke semua perangkat yang terdaftar
-    const pushPromises = users.map(user => 
-      webpush.sendNotification(user.subscription_json, payload).catch(err => console.error('Token expired:', err))
-    );
+    const pushPromises = users.map(user => {
+      // Pastikan data subscription_json ada sebelum ditembak
+      if (user.subscription_json) {
+        return webpush.sendNotification(user.subscription_json, payload)
+          .catch(err => console.error('Token expired atau tidak valid:', err));
+      }
+      return Promise.resolve();
+    });
 
     await Promise.all(pushPromises);
 
-    return NextResponse.json({ success: true, message: 'Notifikasi tugas otomatis terkirim!' });
+    return NextResponse.json({ success: true, message: 'Notifikasi jadwal otomatis terkirim!' });
   } catch (error: any) {
+    console.error('Crash internal pada API:', error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

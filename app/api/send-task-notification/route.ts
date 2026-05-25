@@ -47,29 +47,36 @@ export async function POST(request: Request) {
     // 2. PROSES BACKGROUND: Kirim tanpa bikin database nunggu (Anti-Timeout)
     (async () => {
       try {
-        const { data: listUser } = await supabase
-          .from('zora_notifications')
-          .select('subscription_json');
+        // 🔥 PERUBAHAN SESUAI TABEL BARU KAMU:
+const { data: listUser, error: supabaseError } = await supabase
+  .from('push_subscriptions') // 👈 Ganti nama tabelnya
+  .select('subscription');    // 👈 Ganti nama kolomnya
 
-        if (!listUser || listUser.length === 0) return;
+if (supabaseError) {
+  return NextResponse.json({ error: supabaseError.message }, { status: 500 });
+}
 
-        const payload = JSON.stringify({
-          title: judulNotif,
-          body: isiNotif,
-          icon: '/favicon.ico', // Memakai favicon yang ada di folder public kamu
-          vibrate: [200, 100, 200]
-        });
+if (!listUser || listUser.length === 0) {
+  return NextResponse.json({ message: 'Tidak ada device terdaftar di tabel push_subscriptions.' }, { status: 200 });
+}
 
-        const kirimNotif = listUser.map(user => {
-          if (!user.subscription_json) return Promise.resolve();
-          const subJson = typeof user.subscription_json === 'string' 
-            ? JSON.parse(user.subscription_json) 
-            : user.subscription_json;
+const payload = JSON.stringify({
+  title: judulNotif,
+  body: isiNotif,
+  icon: '/favicon.ico',
+  vibrate: [200, 100, 200]
+});
 
-          return webpush.sendNotification(subJson, payload)
-            .catch(err => console.error('Token expired/unsubscribed:', err.statusCode));
-        });
+const kirimNotif = listUser.map(user => {
+  // 🔥 Sesuaikan pembacaan kolom dari subscription_json menjadi subscription
+  if (!user.subscription) return Promise.resolve();
+  const subJson = typeof user.subscription === 'string' 
+    ? JSON.parse(user.subscription) 
+    : user.subscription;
 
+  return webpush.sendNotification(subJson, payload)
+    .catch(err => console.error('Token expired/unsubscribed:', err.statusCode));
+});
         await Promise.all(kirimNotif);
         console.log(`✅ Sukses broadcast notifikasi dari tabel: ${namaTabel}`);
       } catch (err) {

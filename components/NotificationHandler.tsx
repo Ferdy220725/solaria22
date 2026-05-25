@@ -56,7 +56,7 @@ export default function NotificationHandler() {
           .single();
 
         if (!existing) {
-          await supabase.from('zora_notifications').insert([
+          await supabase.from('push_subscriptions').insert([
             {
               nama_user: `Zoraferrs_User_${Math.floor(Math.random() * 1000)}`,
               subscription_json: tokenString

@@ -56,6 +56,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Tidak ada device terdaftar.' }, { status: 200 });
     }
 
+    // ... (kode atas tetap sama)
+
     const payload = JSON.stringify({
       title: 'Zora: Tugas Baru Dirilis! 📝',
       body: `Mata Kuliah: ${nama_tugas}. Deadline: ${deadline}.`
@@ -71,8 +73,16 @@ export async function POST(request: Request) {
         .catch(err => console.error('Token expired:', err.statusCode));
     });
 
-    await Promise.all(pushPromises);
-    return NextResponse.json({ success: true, message: 'Notifikasi terkirim!' });
+    // 🚀 PERUBAHAN UTAMA DI SINI:
+    // Kita langsung kirim respon sukses ke Database Supabase (biar datanya langsung tersimpan)
+    // Tanpa menunggu Promise.all selesai di-await.
+    
+    Promise.all(pushPromises)
+      .then(() => console.log('Semua notifikasi latar belakang selesai dikirim.'))
+      .catch(err => console.error('Error kirim notif massal:', err));
+
+    // Database menerima status 200 ini dalam waktu < 100ms, data zora_tasks langsung AMAN tersimpan!
+    return NextResponse.json({ success: true, message: 'Proses notifikasi dimulai di latar belakang!' });
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

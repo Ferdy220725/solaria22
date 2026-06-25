@@ -17,6 +17,9 @@ export default function SuperAdminPage() {
   const [absensiEnabled, setAbsensiEnabled] = useState(false);
   const [kodeAbsen, setKodeAbsen] = useState('');
 
+  // --- STATE DATA VERIFIKASI MAHASISWA (FITUR TERBARU) ---
+  const [profiles, setProfiles] = useState<any[]>([]);
+
   // --- STATE BARU: ZOOM (UPDATED FOR SERVER-SIDE AUTO DELETE) ---
   const [zoomMeetings, setZoomMeetings] = useState<any[]>([]);
   const [zoomJudul, setZoomJudul] = useState('');
@@ -57,8 +60,11 @@ export default function SuperAdminPage() {
       const { data: dPrak } = await supabase.from('tugas_praktikum').select('*').order('deadline', { ascending: true });
       const { data: dKuliah } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
       
+      // --- FETCH DATA VERIFIKASI MAHASISWA (FITUR TERBARU) ---
+      const { data: dProfiles } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+      if (dProfiles) setProfiles(dProfiles);
+
       // --- LOGIKA ZOOM (DATABASE CRON ENABLED) ---
-      // Kita hanya perlu mengambil data saja, logika hapus sudah ditangani SQL Cron di Server.
       const { data: dZoomRaw } = await supabase.from('zoom_meetings').select('*').order('waktu_mulai', { ascending: true });
       if (dZoomRaw) setZoomMeetings(dZoomRaw);
 
@@ -94,7 +100,7 @@ export default function SuperAdminPage() {
 
   const handleLogin = (e: any) => {
     e.preventDefault();
-    if (password === "admin123") setRole('WEB');
+    if (password === "adminC22") setRole('WEB');
     else if (password === "absenC789") setRole('ABSEN');
     else alert("Password Salah!");
   };
@@ -109,6 +115,34 @@ export default function SuperAdminPage() {
       }]);
   };
 
+  // --- HANDLER VERIFIKASI MAHASISWA (FITUR TERBARU) ---
+  const handleApproveStudent = async (id: string, nama: string, statusSaatIni: boolean) => {
+    const targetStatus = !statusSaatIni;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_verified: targetStatus })
+      .eq('id', id);
+
+    if (!error) {
+      alert(`Status verifikasi ${nama} berhasil diubah menjadi ${targetStatus ? 'TERVERIFIKASI' : 'BELUM ACC'}!`);
+      fetchData();
+    } else {
+      alert("Gagal memperbarui status: " + error.message);
+    }
+  };
+
+  const handleDeleteStudentProfile = async (id: string, nama: string) => {
+    if (confirm(`Hapus permanen profil pengajuan milik ${nama}? Langkah ini juga akan memutus data auth user terkait.`)) {
+      const { error } = await supabase.from('profiles').delete().eq('id', id);
+      if (!error) {
+        alert("Profil pendaftaran mahasiswa berhasil dihapus!");
+        fetchData();
+      } else {
+        alert("Gagal menghapus: " + error.message);
+      }
+    }
+  };
+
   // --- HANDLER ZOOM (INTEGRATED WITH WAKTU_SELESAI) ---
   const handleAddZoom = async () => {
     if (!zoomJudul || !zoomLink || !zoomWaktu || !zoomWaktuSelesai) {
@@ -119,7 +153,7 @@ export default function SuperAdminPage() {
       judul: zoomJudul.trim(),
       link: zoomLink.trim(),
       waktu_mulai: formatToWIB(zoomWaktu),
-      waktu_selesai: formatToWIB(zoomWaktuSelesai), // Mengirim waktu selesai ke Supabase
+      waktu_selesai: formatToWIB(zoomWaktuSelesai),
       is_active: true,
     }]);
 
@@ -471,7 +505,7 @@ export default function SuperAdminPage() {
                     <tr key={idx} className="border-b font-bold text-slate-700">
                       <td className="py-3 uppercase">{a.nama_mahasiswa}</td>
                       <td className="py-3">{a.npm}</td>
-                      <td className="py-3 text-slate-400">{new Date(a.waktu_absen).toLocaleString('id-ID')}</td>
+                      <td className="py-3 text-slate-400">{a.waktu_absen ? new Date(a.waktu_absen).toLocaleString('id-ID') : '-'}</td>
                     </tr>
                   ))}
                 </tbody>

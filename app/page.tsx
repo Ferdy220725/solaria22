@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { createClient } from '../utils/supabase/client';
+import { createClient } from '../utils/supabase/client'; // Sesuaikan jika menggunakan alias '@/utils/...'
 import { useRouter } from 'next/navigation';
 import Lottie from "lottie-react";
 import catAnimation from "../public/cat.json";
@@ -21,9 +21,14 @@ interface Leader {
   tugas_selesai: number;
 }
 
+interface BuktiTugas {
+  tugas_id: string;
+  link_bukti: string;
+  created_at: string;
+}
+
 export default function Dashboard() {
   const [tugas, setTugas] = useState<Tugas[]>([]);
-  const [showDashboard, setShowDashboard] = useState(false);
   const [displayName, setDisplayName] = useState('Hallo, Sobat Agrotek 🍃');
   const [completedTaskIds, setCompletedTaskIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'perlu dikerjakan' | 'sudah selesai'>('perlu dikerjakan');
@@ -31,6 +36,9 @@ export default function Dashboard() {
   const [topThree, setTopThree] = useState<Leader[]>([]);
   const [zoomMeetings, setZoomMeetings] = useState<any[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // STATE RIWAYAT BUKTI
+  const [riwayatBukti, setRiwayatBukti] = useState<Record<string, BuktiTugas>>({});
 
   const supabase = createClient();
   const router = useRouter();
@@ -46,6 +54,7 @@ export default function Dashboard() {
   const isEAS = todayStr >= rangeEAS.start && todayStr <= rangeEAS.end;
 
   useEffect(() => {
+    localStorage.removeItem("isDashboardOpened");
     fetchDataAndSync();
     checkDeadlineTrigger();
     const zoomTimer = setInterval(() => setCurrentTime(new Date()), 30000);
@@ -55,7 +64,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (showLeaderboard) {
       const timer = setTimeout(() => setShowLeaderboard(false), 10000);
-      return () => clearTimeout(timer);
+      return () => clearInterval(timer);
     }
   }, [showLeaderboard]);
 
@@ -69,12 +78,37 @@ export default function Dashboard() {
     const savedName = localStorage.getItem('nama_user_solaria') || 'Sobat Agrotek';
     setDisplayName(`${savedName.trim().split(' ')[0]} 🍃`);
     
-    const savedCompleted = JSON.parse(localStorage.getItem('agrotek_completed_tasks') || '[]');
-    setCompletedTaskIds(savedCompleted);
+    // SINKRONISASI CLOUD DENGAN SUPABASE AUTH
+    const { data: { user } } = await supabase.auth.getUser();
+    let currentCompletedTasks = JSON.parse(localStorage.getItem('agrotek_completed_tasks') || '[]');
+
+    if (user) {
+      const { data: buktiData } = await supabase
+        .from('bukti_tugas')
+        .select('tugas_id, link_bukti, created_at')
+        .eq('user_id', user.id);
+
+      if (buktiData) {
+        const buktiMap: Record<string, BuktiTugas> = {};
+        const completedIdsFromDB: string[] = [];
+
+        buktiData.forEach((b) => {
+          buktiMap[b.tugas_id] = b;
+          completedIdsFromDB.push(b.tugas_id);
+        });
+        
+        setRiwayatBukti(buktiMap);
+        currentCompletedTasks = completedIdsFromDB;
+        setCompletedTaskIds(completedIdsFromDB);
+        localStorage.setItem('agrotek_completed_tasks', JSON.stringify(completedIdsFromDB));
+      }
+    } else {
+      setCompletedTaskIds(currentCompletedTasks);
+    }
 
     await supabase.from('user_progress').upsert({
       nama_user: savedName, 
-      tugas_selesai: savedCompleted.length, 
+      tugas_selesai: currentCompletedTasks.length, 
       last_update: new Date()
     }, { onConflict: 'nama_user' });
   };
@@ -100,7 +134,54 @@ export default function Dashboard() {
   };
 
   const handleToggleDone = async (id: string, isCurrentlyDone: boolean) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      alert("Silakan login terlebih dahulu. Kamu akan diarahkan ke halaman login.");
+      router.push('/login');
+      return;
+    }
+
     const willBeDone = !isCurrentlyDone;
+    let linkBuktiInput = "";
+
+    if (willBeDone) {
+      const urlInput = prompt("Masukkan Link Bukti Pengumpulan Tugas (contoh link Google Drive / Elena / Screenshot):");
+      if (urlInput === null) return; 
+      if (!urlInput.trim()) {
+        alert("Bukti tugas wajib diisi agar tersimpan di sistem!");
+        return;
+      }
+      linkBuktiInput = urlInput.trim();
+
+      const { error } = await supabase
+        .from('bukti_tugas')
+        .upsert({
+          user_id: user.id,
+          tugas_id: id,
+          link_bukti: linkBuktiInput,
+        }, { onConflict: 'user_id,tugas_id' });
+
+      if (error) {
+        alert("Gagal menyimpan bukti ke sistem: " + error.message);
+        return;
+      }
+    } else {
+      const konfirmasi = confirm("Apakah Anda yakin ingin membatalkan status selesai? Bukti pengumpulan di sistem akan dihapus.");
+      if (!konfirmasi) return;
+
+      const { error } = await supabase
+        .from('bukti_tugas')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('tugas_id', id);
+
+      if (error) {
+        alert("Gagal memperbarui status di sistem: " + error.message);
+        return;
+      }
+    }
+
     const newCompleted = willBeDone
       ? [...completedTaskIds, id]
       : completedTaskIds.filter(tid => tid !== id);
@@ -114,6 +195,8 @@ export default function Dashboard() {
       tugas_selesai: newCompleted.length, 
       last_update: new Date()
     }, { onConflict: 'nama_user' });
+
+    fetchDataAndSync();
 
     if (willBeDone) {
       const { data: leaders } = await supabase.from('user_progress').select('nama_user, tugas_selesai').order('tugas_selesai', { ascending: false }).limit(3);
@@ -131,6 +214,11 @@ export default function Dashboard() {
     return `${day}, ${date}/${month} pkl ${hours}:${minutes} WIB`;
   };
 
+  const formatWaktuSelesai = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} pkl ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')} WIB`;
+  };
+
   const isMepet = (dateStr: string) => {
     const diff = new Date(dateStr).getTime() - new Date().getTime();
     return diff > 0 && diff < (6 * 60 * 60 * 1000);
@@ -139,22 +227,6 @@ export default function Dashboard() {
   const displayedTugas = tugas.filter(t => 
     activeTab === 'perlu dikerjakan' ? !completedTaskIds.includes(t.id) : completedTaskIds.includes(t.id)
   );
-
-  if (!showDashboard) {
-    return (
-      <div className="h-screen w-full bg-[#f8f9fa] flex flex-col items-center justify-center p-6">
-        <div className="w-48 h-48 md:w-64 md:h-64 mb-2">
-          <Lottie animationData={catAnimation} loop={true} />
-        </div>
-        <div className="text-center bg-white p-8 rounded-[35px] shadow-2xl border-b-[8px] border-[#800020] w-full max-w-sm border-2 border-slate-200">
-          <h1 className="text-2xl font-black text-[#800020] uppercase leading-tight italic">HALLO, {displayName}</h1>
-          <button onClick={() => setShowDashboard(true)} className="w-full mt-6 bg-[#800020] text-white py-4 rounded-xl font-black uppercase shadow-lg active:scale-95 transition-all">
-            Buka Dashboard →
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#fcfcfc] font-sans pb-20 overflow-x-hidden">
@@ -217,7 +289,7 @@ export default function Dashboard() {
           </button>
 
           <div className="bg-white p-5 rounded-[35px] shadow-xl border-b-8 border-blue-600 border-2 border-slate-200 flex flex-col justify-center items-center text-center">
-            <p className="text-[9px] font-black text-slate-400 uppercase italic mb-1">Status Akademik:</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase italic mb-1">Status Academic:</p>
             <p className={`font-black uppercase text-xs ${isETS || isEAS ? 'text-red-600' : 'text-blue-700'}`}>
               {isETS || isEAS ? 'Masa Evaluasi (ETS/EAS)' : 'Perkuliahan Aktif'}
             </p>
@@ -285,6 +357,8 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 gap-4">
             {displayedTugas.length > 0 ? displayedTugas.map((t) => {
               const isLewat = new Date().getTime() > new Date(t.deadline).getTime();
+              const buktiUser = riwayatBukti[t.id];
+
               return (
                 <details key={t.id} className={`group bg-[#fdfdfd] border-2 rounded-[30px] transition-all overflow-hidden ${isMepet(t.deadline) && activeTab === 'perlu dikerjakan' ? 'border-red-400' : 'border-slate-200'}`}>
                   <summary className="p-6 cursor-pointer list-none flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -305,11 +379,47 @@ export default function Dashboard() {
                   <div className="p-6 pt-0 border-t-2 border-dashed border-slate-100 bg-slate-50/50">
                     <div className="py-4">
                       {isLewat && activeTab === 'perlu dikerjakan' ? (
-                        <div className="mb-4 bg-red-700 text-white text-[9px] font-black py-1 px-3 rounded uppercase tracking-widest inline-block">WAKTU HABIS!</div>
+                        <div className="p-1 bg-red-700 text-white text-[8px] font-black py-1 px-3 rounded uppercase tracking-widest inline-block">WAKTU HABIS!</div>
                       ) : isMepet(t.deadline) && activeTab === 'perlu dikerjakan' && (
-                        <div className="mb-4 bg-red-600 text-white text-[9px] font-black py-1 px-3 rounded uppercase tracking-widest animate-bounce inline-block">DEADLINE MEPET!</div>
+                        <div className="p-1 bg-red-600 text-white text-[8px] font-black py-1 px-3 rounded uppercase tracking-widest animate-bounce inline-block">DEADLINE MEPET!</div>
                       )}
                       <p className="text-[13px] text-slate-700 font-medium leading-relaxed whitespace-pre-line">{t.deskripsi || 'Tidak ada deskripsi.'}</p>
+                      
+                      {/* RIWAYAT BUKTI PENGUMPULAN DENGAN KOTAK IDENTITAS MAHASISWA */}
+                      {activeTab === 'sudah selesai' && buktiUser && (
+                        <div className="mt-4 p-4 bg-green-50 border-2 border-green-200 rounded-[25px] text-left flex flex-col gap-2">
+                          <p className="text-[9px] font-black text-green-700 uppercase tracking-wider flex items-center gap-1">
+                            🛡️ BUKTI SAH TERDETEKSI SISTEM
+                          </p>
+
+                          {/* KOTAK IDENTITAS DI-GENERATE OTOMATIS */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white/80 border border-green-100 p-3 rounded-2xl text-xs shadow-sm">
+                            <div>
+                              <span className="font-bold text-slate-400 block text-[9px] uppercase tracking-wider">Nama Mahasiswa</span>
+                              <span className="font-black text-slate-800 uppercase">{localStorage.getItem('nama_user_solaria') || 'Sobat Agrotek'}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold text-slate-400 block text-[9px] uppercase tracking-wider">NPM / No. Mahasiswa</span>
+                              <span className="font-mono font-black text-slate-800">{localStorage.getItem('npm_user_solaria') || 'NPM BELUM TERINDIKASI'}</span>
+                            </div>
+                          </div>
+
+                          {/* INFORMASI WAKTU DAN LINK */}
+                          <div className="text-xs font-bold text-slate-600 mt-1 space-y-1">
+                            <p>
+                              Diselesaikan pada: <span className="text-slate-900 font-black">{formatWaktuSelesai(buktiUser.created_at)}</span>
+                            </p>
+                            <a 
+                              href={buktiUser.link_bukti} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="mt-2 inline-block text-xs font-black text-blue-600 underline uppercase hover:text-blue-800 break-all"
+                            >
+                              🔗 Buka Link Bukti Pengumpulan Tugas
+                            </a>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3">

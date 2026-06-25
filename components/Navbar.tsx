@@ -11,7 +11,7 @@ import {
   Menu,
   X,
   Sprout,
-  CalendarDays // Import icon baru untuk Jadwal
+  CalendarDays 
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -21,17 +21,9 @@ export default function Navbar() {
   const [shouldShow, setShouldShow] = useState(false);
 
   useEffect(() => {
-    const checkVisibility = () => {
-      const isWelcomePage = !!document.querySelector('button')?.textContent?.includes("Masuk Dashboard");
-      if (pathname !== "/") {
-        setShouldShow(true);
-      } else {
-        setShouldShow(!isWelcomePage);
-      }
-    };
-    checkVisibility();
-    window.addEventListener('click', checkVisibility);
-    return () => window.removeEventListener('click', checkVisibility);
+    // Karena gerbang verifikasi di page.tsx sudah dihapus, 
+    // menu navigasi sekarang HARUS selalu muncul di semua halaman.
+    setShouldShow(true);
   }, [pathname]);
 
   if (!shouldShow) return null;
@@ -40,7 +32,6 @@ export default function Navbar() {
     { id: "m1", name: "Home", href: "/", icon: <LayoutDashboard size={20} /> },
     { id: "m2", name: "Materi", href: "/materi", icon: <BookOpen size={20} /> },
     { id: "m3", name: "Praktikum", href: "/praktikum", icon: <FlaskConical size={20} /> },
-    // MENU BARU: Jadwal Perkuliahan
     { id: "m_jadwal", name: "Jadwal", href: "/jadwal-sistem/list", icon: <CalendarDays size={20} /> },
     {
       id: "m_ext",

@@ -44,6 +44,7 @@ export default function SuperAdminPage() {
 
   const [judulMateri, setJudulMateri] = useState('');
   const [mkMateri, setMkMateri] = useState('');
+  const [semesterMateri, setSemesterMateri] = useState(''); // State Baru untuk Input Semester Materi
   const [file, setFile] = useState<File | null>(null);
 
   // --- HELPER ---
@@ -211,26 +212,59 @@ export default function SuperAdminPage() {
     }
   };
 
-  const handleUploadMateri = async () => {
-    if (!file || !judulMateri) return alert("Isi Judul & Pilih File!");
-    const fileName = `${Date.now()}_${file.name}`;
-    const { error: storageError } = await supabase.storage.from('uploads').upload(fileName, file);
-    if (storageError) return alert("Gagal Upload: " + storageError.message);
+ const handleUploadMateri = async () => {
+  // 1. Validasi Input Lengkap
+  if (!file) return alert("Silakan pilih file terlebih dahulu!");
+  if (!judulMateri.trim()) return alert("Judul materi tidak boleh kosong!");
+  if (!mkMateri.trim()) return alert("Nama Mata Kuliah tidak boleh kosong!");
+  if (!semesterMateri) return alert("Semester harus diisi!");
 
+  try {
+    // 2. Proses Upload ke Supabase Storage Bucket 'uploads'
+    const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+    const { error: storageError } = await supabase.storage
+      .from('uploads')
+      .upload(fileName, file);
+
+    if (storageError) {
+      console.error("Storage Error:", storageError);
+      return alert("Gagal Upload File ke Storage: " + storageError.message);
+    }
+
+    // 3. Ambil Public URL File yang diunggah
     const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(fileName);
+    if (!urlData?.publicUrl) {
+      return alert("Gagal mendapatkan URL file dari storage.");
+    }
+
+    // 4. Input Data ke Tabel 'materi'
     const { error: dbError } = await supabase.from('materi').insert([{
       judul: judulMateri.trim(),
       file_url: urlData.publicUrl,
-      mk_nama: mkMateri.trim()
+      mk_nama: mkMateri.trim(),
+      semester: parseInt(semesterMateri)
     }]);
     
-    if (!dbError) {
-      await sendNotification("📖 Materi Kuliah Baru", `${mkMateri.trim()}: ${judulMateri.trim()}`, "materi");
-      alert("Materi Berhasil!");
-      setJudulMateri(''); setMkMateri(''); setFile(null);
-      fetchData();
+    if (dbError) {
+      console.error("Database Error:", dbError);
+      return alert("File terupload, tapi GAGAL simpan ke Database: " + dbError.message);
     }
-  };
+
+    // 5. Jika Semua Berhasil
+    alert("Materi Berhasil Diunggah dan Disimpan!");
+    setJudulMateri(''); 
+    setMkMateri(''); 
+    setSemesterMateri(''); 
+    setFile(null);
+    
+    // Refresh data jika diperlukan
+    if (typeof fetchData === 'function') fetchData();
+
+  } catch (err: any) {
+    console.error("Crash Error:", err);
+    alert("Terjadi kesalahan sistem: " + err.message);
+  }
+};
 
   const deleteData = async (id: any, table: string) => {
     if (confirm("Hapus data ini?")) {
@@ -396,6 +430,10 @@ export default function SuperAdminPage() {
               <h2 className="font-black mb-4 text-slate-700 uppercase text-xs">3. Upload Materi</h2>
               <input type="text" placeholder="Matkul" className="w-full border p-3 mb-2 rounded-xl text-xs text-black" value={mkMateri} onChange={e => setMkMateri(e.target.value)} />
               <input type="text" placeholder="Judul Materi" className="w-full border p-3 mb-2 rounded-xl text-xs text-black" value={judulMateri} onChange={e => setJudulMateri(e.target.value)} />
+              
+              {/* Tambahan Input Semester Baru */}
+              <input type="number" placeholder="Semester (Contoh: 3)" className="w-full border p-3 mb-2 rounded-xl text-xs text-black font-bold focus:border-[#800020] outline-none" value={semesterMateri} onChange={e => setSemesterMateri(e.target.value)} min="1" />
+              
               <input type="file" className="w-full mb-4 text-[10px] text-black" onChange={e => setFile(e.target.files?.[0] || null)} />
               <button onClick={handleUploadMateri} className="w-full bg-[#800020] text-white py-3 rounded-xl font-black text-xs shadow-md">UPLOAD</button>
             </div>

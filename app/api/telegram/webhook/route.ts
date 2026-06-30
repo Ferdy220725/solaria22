@@ -145,14 +145,33 @@ export async function POST(req: NextRequest) {
 
     switch (command) {
       case "/start":
-      case "/help": await handleHelp(chatId); break;
-      case "/jadwal": await handleJadwal(chatId); break;
-      case "/tugas": await handleTugas(chatId); break;
-      case "/tugaskuliah": await handleTugasKuliah(chatId); break;
-      case "/tugasprak": await handleTugasPrak(chatId); break;
-      case "/absen": await handleAbsen(chatId); break;
-      case "/materi": await handleMateri(chatId, args); break;
-      default: break;
+      case "/help":
+        await handleHelp(chatId);
+        break;
+      case "/jadwal":
+        await handleJadwal(chatId);
+        break;
+      case "/tugas":
+        await handleTugas(chatId);
+        break;
+      case "/tugaskuliah":
+        await handleTugasKuliah(chatId);
+        break;
+      case "/tugasprak":
+        await handleTugasPrak(chatId);
+        break;
+      case "/absen":
+        await handleAbsen(chatId);
+        break;
+      case "/materi":
+        await handleMateri(chatId, args);
+        break;
+      // TAMBAHKAN INI AGAR /materi_cari merespons
+      case "/materi_cari":
+        await replyTelegram(chatId, "💡 Tips: Ketik /materi [kata kunci] untuk mencari materi.");
+        break;
+      default:
+        break;
     }
 
     return NextResponse.json({ ok: true });

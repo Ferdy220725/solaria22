@@ -33,17 +33,15 @@ function formatWIB(dateString: string) {
       dateStyle: "medium",
       timeStyle: "short",
     });
-  } catch {
-    return dateString;
-  }
+  } catch { return dateString; }
 }
 
-// ── Command Handlers ───────────────────────────────────────────────────────
+// ── Command Handlers ──────────────────────────────────────────────────────
 
 async function handleHelp(chatId: number | string) {
   const text =
     `🤖 <b>Bot Akademik — Daftar Command</b>\n\n` +
-    `/jadwal — Jadwal Zoom aktif hari ini\n` +
+    `/jadwal — Jadwal Zoom aktif\n` +
     `/materi — 10 materi terbaru\n` +
     `/materi [kata kunci] — Cari materi (mk/judul)\n` +
     `/tugas — Semua tugas aktif (kuliah + praktikum)\n` +
@@ -56,38 +54,24 @@ async function handleHelp(chatId: number | string) {
 
 async function handleJadwal(chatId: number | string) {
   const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from("zoom_meetings")
-    .select("*")
-    .eq("is_active", true)
-    .gte("waktu_selesai", now)
-    .order("waktu_mulai", { ascending: true });
+  const { data, error } = await supabase.from("zoom_meetings").select("*").eq("is_active", true).gte("waktu_selesai", now).order("waktu_mulai", { ascending: true });
 
-  if (error) { await replyTelegram(chatId, "❌ Gagal mengambil data jadwal."); return; }
-  if (!data || data.length === 0) { await replyTelegram(chatId, "📭 Tidak ada jadwal Zoom aktif saat ini."); return; }
+  if (error || !data || data.length === 0) { await replyTelegram(chatId, "📭 Tidak ada jadwal Zoom aktif saat ini."); return; }
 
   let text = `🎥 <b>JADWAL ZOOM AKTIF</b>\n\n`;
   data.forEach((z, i) => {
-    text += `${i + 1}. <b>${z.judul}</b>\n` +
-      ` 🕐 Mulai  : ${formatWIB(z.waktu_mulai)}\n` +
-      ` 🕔 Selesai: ${formatWIB(z.waktu_selesai)}\n` +
-      ` 🔗 <a href="${z.link}">Klik untuk Join</a>\n\n`;
+    text += `${i + 1}. <b>${z.judul}</b>\n 🕐 Mulai  : ${formatWIB(z.waktu_mulai)}\n 🕔 Selesai: ${formatWIB(z.waktu_selesai)}\n 🔗 <a href="${z.link}">Klik untuk Join</a>\n\n`;
   });
   await replyTelegram(chatId, text);
 }
 
 async function handleTugasKuliah(chatId: number | string) {
-  const { data, error } = await supabase
-    .from("tugas_perkuliahan")
-    .select("*")
-    .order("deadline", { ascending: true });
-
-  if (error || !data || data.length === 0) { await replyTelegram(chatId, "📭 Tidak ada tugas perkuliahan aktif saat ini."); return; }
+  const { data, error } = await supabase.from("tugas_perkuliahan").select("*").order("deadline", { ascending: true });
+  if (error || !data || data.length === 0) { await replyTelegram(chatId, "📭 Tidak ada tugas perkuliahan aktif."); return; }
 
   let text = `📚 <b>TUGAS PERKULIAHAN</b>\n\n`;
   data.forEach((t, i) => {
-    text += `${i + 1}. [${t.mk_nama || "-"}] <b>${t.judul_tugas}</b>\n` +
-      ` ⏰ Deadline: ${formatWIB(t.deadline)}\n`;
+    text += `${i + 1}. [${t.mk_nama || "-"}] <b>${t.judul_tugas}</b>\n ⏰ Deadline: ${formatWIB(t.deadline)}\n`;
     if (t.deskripsi) text += ` 📝 ${t.deskripsi}\n`;
     if (t.link_pengumpulan) text += ` 🔗 <a href="${t.link_pengumpulan}">Link Pengumpulan</a>\n\n`;
   });
@@ -95,12 +79,8 @@ async function handleTugasKuliah(chatId: number | string) {
 }
 
 async function handleTugasPrak(chatId: number | string) {
-  const { data, error } = await supabase
-    .from("tugas_praktikum")
-    .select("*")
-    .order("deadline", { ascending: true });
-
-  if (error || !data) { await replyTelegram(chatId, "❌ Gagal mengambil data tugas praktikum."); return; }
+  const { data, error } = await supabase.from("tugas_praktikum").select("*").order("deadline", { ascending: true });
+  if (error || !data) { await replyTelegram(chatId, "❌ Gagal mengambil data."); return; }
 
   const now = new Date();
   const aktif = data.filter((t) => {
@@ -109,12 +89,11 @@ async function handleTugasPrak(chatId: number | string) {
     return now <= batasHapus;
   });
 
-  if (aktif.length === 0) { await replyTelegram(chatId, "📭 Tidak ada tugas praktikum aktif saat ini."); return; }
+  if (aktif.length === 0) { await replyTelegram(chatId, "📭 Tidak ada tugas praktikum aktif."); return; }
 
   let text = `🧪 <b>TUGAS PRAKTIKUM</b>\n\n`;
   aktif.forEach((t, i) => {
-    text += `${i + 1}. [${t.mk_nama} - Gol ${t.golongan}] <b>${t.judul_tugas}</b>\n` +
-      ` ⏰ Deadline: ${formatWIB(t.deadline)}\n`;
+    text += `${i + 1}. [${t.mk_nama} - Gol ${t.golongan}] <b>${t.judul_tugas}</b>\n ⏰ Deadline: ${formatWIB(t.deadline)}\n`;
     if (t.deskripsi) text += ` 📝 ${t.deskripsi}\n`;
     if (t.link_pengumpulan) text += ` 🔗 <a href="${t.link_pengumpulan}">Link Pengumpulan</a>\n\n`;
   });
@@ -127,13 +106,8 @@ async function handleTugas(chatId: number | string) {
 }
 
 async function handleAbsen(chatId: number | string) {
-  const { data, error } = await supabase
-    .from("status_sistem")
-    .select("*")
-    .eq("id", "absensi")
-    .maybeSingle();
-
-  if (error || !data) { await replyTelegram(chatId, "❌ Gagal mengambil status absensi."); return; }
+  const { data, error } = await supabase.from("status_sistem").select("*").eq("id", "absensi").maybeSingle();
+  if (error || !data) { await replyTelegram(chatId, "❌ Gagal mengambil status."); return; }
   const status = data.is_active ? "🟢 DIBUKA" : "🔴 DITUTUP";
   const kode = data.is_active ? `\n🔑 Kode Akses: <code>${data.kode_akses || "-"}</code>` : "";
   await replyTelegram(chatId, `🚪 <b>STATUS ABSENSI</b>\n\nStatus: <b>${status}</b>${kode}`);
@@ -141,26 +115,17 @@ async function handleAbsen(chatId: number | string) {
 
 async function handleMateri(chatId: number | string, keyword: string) {
   let query = supabase.from("materi").select("*").order("created_at", { ascending: false });
-
-  if (keyword) {
-    query = query.or(`judul.ilike.%${keyword}%,mk_nama.ilike.%${keyword}%`);
-  } else {
-    query = query.limit(10);
-  }
+  if (keyword) { query = query.or(`judul.ilike.%${keyword}%,mk_nama.ilike.%${keyword}%`); } else { query = query.limit(10); }
 
   const { data, error } = await query;
-  if (error) { await replyTelegram(chatId, "❌ Gagal mengambil data materi."); return; }
+  if (error) { await replyTelegram(chatId, "❌ Gagal mengambil materi."); return; }
   if (!data || data.length === 0) {
-    const pesan = keyword ? `📭 Tidak ditemukan materi dengan kata kunci "<b>${keyword}</b>".` : "📭 Belum ada materi yang tersedia.";
-    await replyTelegram(chatId, pesan);
+    await replyTelegram(chatId, keyword ? `📭 Materi "<b>${keyword}</b>" tidak ditemukan.` : "📭 Belum ada materi.");
     return;
   }
 
   let text = keyword ? `📂 <b>HASIL PENCARIAN: "${keyword}"</b>\n\n` : `📂 <b>MATERI TERBARU</b>\n\n`;
-  data.forEach((m, i) => {
-    text += `${i + 1}. [${m.mk_nama}] <b>${m.judul}</b>\n` +
-      ` 🔗 <a href="${m.file_url}">Buka Materi</a>\n\n`;
-  });
+  data.forEach((m, i) => { text += `${i + 1}. [${m.mk_nama}] <b>${m.judul}</b>\n 🔗 <a href="${m.file_url}">Buka Materi</a>\n\n`; });
   await replyTelegram(chatId, text);
 }
 
@@ -180,29 +145,14 @@ export async function POST(req: NextRequest) {
 
     switch (command) {
       case "/start":
-      case "/help":
-        await handleHelp(chatId);
-        break;
-      case "/jadwal":
-        await handleJadwal(chatId);
-        break;
-      case "/tugas":
-        await handleTugas(chatId);
-        break;
-      case "/tugaskuliah":
-        await handleTugasKuliah(chatId);
-        break;
-      case "/tugasprak":
-        await handleTugasPrak(chatId);
-        break;
-      case "/absen":
-        await handleAbsen(chatId);
-        break;
-      case "/materi":
-        await handleMateri(chatId, args);
-        break;
-      default:
-        break;
+      case "/help": await handleHelp(chatId); break;
+      case "/jadwal": await handleJadwal(chatId); break;
+      case "/tugas": await handleTugas(chatId); break;
+      case "/tugaskuliah": await handleTugasKuliah(chatId); break;
+      case "/tugasprak": await handleTugasPrak(chatId); break;
+      case "/absen": await handleAbsen(chatId); break;
+      case "/materi": await handleMateri(chatId, args); break;
+      default: break;
     }
 
     return NextResponse.json({ ok: true });
@@ -212,6 +162,4 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
-  return NextResponse.json({ status: "Webhook aktif ✅" });
-}
+export async function GET() { return NextResponse.json({ status: "Webhook aktif ✅" }); }

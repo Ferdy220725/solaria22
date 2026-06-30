@@ -1,10 +1,7 @@
-// app/api/telegram/webhook/route.ts
-// Letakkan file ini di: app/api/telegram/webhook/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// ── Supabase client (server-side, pakai service role key) ──────────────────
+// ── Supabase client ────────────────────────────────────────────────────────
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -43,11 +40,12 @@ function formatWIB(dateString: string) {
 
 // ── Command Handlers ───────────────────────────────────────────────────────
 
-/** /start atau /help — daftar command */
 async function handleHelp(chatId: number | string) {
   const text =
     `🤖 <b>Bot Akademik — Daftar Command</b>\n\n` +
     `/jadwal — Jadwal Zoom aktif hari ini\n` +
+    `/materi — 10 materi terbaru\n` +
+    `/materi [kata kunci] — Cari materi (mk/judul)\n` +
     `/tugas — Semua tugas aktif (kuliah + praktikum)\n` +
     `/tugaskuliah — Tugas perkuliahan saja\n` +
     `/tugasprak — Tugas praktikum saja\n` +
@@ -56,75 +54,53 @@ async function handleHelp(chatId: number | string) {
   await replyTelegram(chatId, text);
 }
 
-/** /jadwal — ambil zoom_meetings yang is_active = true */
 async function handleJadwal(chatId: number | string) {
   const now = new Date().toISOString();
-
   const { data, error } = await supabase
     .from("zoom_meetings")
     .select("*")
     .eq("is_active", true)
-    .gte("waktu_selesai", now) // belum selesai
+    .gte("waktu_selesai", now)
     .order("waktu_mulai", { ascending: true });
 
-  if (error) {
-    await replyTelegram(chatId, "❌ Gagal mengambil data jadwal.");
-    return;
-  }
-
-  if (!data || data.length === 0) {
-    await replyTelegram(chatId, "📭 Tidak ada jadwal Zoom aktif saat ini.");
-    return;
-  }
+  if (error) { await replyTelegram(chatId, "❌ Gagal mengambil data jadwal."); return; }
+  if (!data || data.length === 0) { await replyTelegram(chatId, "📭 Tidak ada jadwal Zoom aktif saat ini."); return; }
 
   let text = `🎥 <b>JADWAL ZOOM AKTIF</b>\n\n`;
   data.forEach((z, i) => {
-    text +=
-      `${i + 1}. <b>${z.judul}</b>\n` +
-      `   🕐 Mulai  : ${formatWIB(z.waktu_mulai)}\n` +
-      `   🕔 Selesai: ${formatWIB(z.waktu_selesai)}\n` +
-      `   🔗 <a href="${z.link}">Klik untuk Join</a>\n\n`;
+    text += `${i + 1}. <b>${z.judul}</b>\n` +
+      ` 🕐 Mulai  : ${formatWIB(z.waktu_mulai)}\n` +
+      ` 🕔 Selesai: ${formatWIB(z.waktu_selesai)}\n` +
+      ` 🔗 <a href="${z.link}">Klik untuk Join</a>\n\n`;
   });
-
   await replyTelegram(chatId, text);
 }
 
-/** /tugaskuliah — tugas_perkuliahan */
 async function handleTugasKuliah(chatId: number | string) {
   const { data, error } = await supabase
     .from("tugas_perkuliahan")
     .select("*")
     .order("deadline", { ascending: true });
 
-  if (error || !data || data.length === 0) {
-    await replyTelegram(chatId, "📭 Tidak ada tugas perkuliahan aktif saat ini.");
-    return;
-  }
+  if (error || !data || data.length === 0) { await replyTelegram(chatId, "📭 Tidak ada tugas perkuliahan aktif saat ini."); return; }
 
   let text = `📚 <b>TUGAS PERKULIAHAN</b>\n\n`;
   data.forEach((t, i) => {
-    text +=
-      `${i + 1}. [${t.mk_nama || "-"}] <b>${t.judul_tugas}</b>\n` +
-      `   ⏰ Deadline: ${formatWIB(t.deadline)}\n`;
-    if (t.deskripsi) text += `   📝 ${t.deskripsi}\n`;
-    if (t.link_pengumpulan) text += `   🔗 <a href="${t.link_pengumpulan}">Link Pengumpulan</a>\n`;
-    text += "\n";
+    text += `${i + 1}. [${t.mk_nama || "-"}] <b>${t.judul_tugas}</b>\n` +
+      ` ⏰ Deadline: ${formatWIB(t.deadline)}\n`;
+    if (t.deskripsi) text += ` 📝 ${t.deskripsi}\n`;
+    if (t.link_pengumpulan) text += ` 🔗 <a href="${t.link_pengumpulan}">Link Pengumpulan</a>\n\n`;
   });
-
   await replyTelegram(chatId, text);
 }
 
-/** /tugasprak — tugas_praktikum (filter: hapus 3 hari setelah deadline) */
 async function handleTugasPrak(chatId: number | string) {
   const { data, error } = await supabase
     .from("tugas_praktikum")
     .select("*")
     .order("deadline", { ascending: true });
 
-  if (error || !data) {
-    await replyTelegram(chatId, "❌ Gagal mengambil data tugas praktikum.");
-    return;
-  }
+  if (error || !data) { await replyTelegram(chatId, "❌ Gagal mengambil data tugas praktikum."); return; }
 
   const now = new Date();
   const aktif = data.filter((t) => {
@@ -133,31 +109,23 @@ async function handleTugasPrak(chatId: number | string) {
     return now <= batasHapus;
   });
 
-  if (aktif.length === 0) {
-    await replyTelegram(chatId, "📭 Tidak ada tugas praktikum aktif saat ini.");
-    return;
-  }
+  if (aktif.length === 0) { await replyTelegram(chatId, "📭 Tidak ada tugas praktikum aktif saat ini."); return; }
 
   let text = `🧪 <b>TUGAS PRAKTIKUM</b>\n\n`;
   aktif.forEach((t, i) => {
-    text +=
-      `${i + 1}. [${t.mk_nama} - Gol ${t.golongan}] <b>${t.judul_tugas}</b>\n` +
-      `   ⏰ Deadline: ${formatWIB(t.deadline)}\n`;
-    if (t.deskripsi) text += `   📝 ${t.deskripsi}\n`;
-    if (t.link_pengumpulan) text += `   🔗 <a href="${t.link_pengumpulan}">Link Pengumpulan</a>\n`;
-    text += "\n";
+    text += `${i + 1}. [${t.mk_nama} - Gol ${t.golongan}] <b>${t.judul_tugas}</b>\n` +
+      ` ⏰ Deadline: ${formatWIB(t.deadline)}\n`;
+    if (t.deskripsi) text += ` 📝 ${t.deskripsi}\n`;
+    if (t.link_pengumpulan) text += ` 🔗 <a href="${t.link_pengumpulan}">Link Pengumpulan</a>\n\n`;
   });
-
   await replyTelegram(chatId, text);
 }
 
-/** /tugas — gabungan kuliah + prak */
 async function handleTugas(chatId: number | string) {
   await handleTugasKuliah(chatId);
   await handleTugasPrak(chatId);
 }
 
-/** /absen — status sistem absensi */
 async function handleAbsen(chatId: number | string) {
   const { data, error } = await supabase
     .from("status_sistem")
@@ -165,36 +133,50 @@ async function handleAbsen(chatId: number | string) {
     .eq("id", "absensi")
     .maybeSingle();
 
-  if (error || !data) {
-    await replyTelegram(chatId, "❌ Gagal mengambil status absensi.");
+  if (error || !data) { await replyTelegram(chatId, "❌ Gagal mengambil status absensi."); return; }
+  const status = data.is_active ? "🟢 DIBUKA" : "🔴 DITUTUP";
+  const kode = data.is_active ? `\n🔑 Kode Akses: <code>${data.kode_akses || "-"}</code>` : "";
+  await replyTelegram(chatId, `🚪 <b>STATUS ABSENSI</b>\n\nStatus: <b>${status}</b>${kode}`);
+}
+
+async function handleMateri(chatId: number | string, keyword: string) {
+  let query = supabase.from("materi").select("*").order("created_at", { ascending: false });
+
+  if (keyword) {
+    query = query.or(`judul.ilike.%${keyword}%,mk_nama.ilike.%${keyword}%`);
+  } else {
+    query = query.limit(10);
+  }
+
+  const { data, error } = await query;
+  if (error) { await replyTelegram(chatId, "❌ Gagal mengambil data materi."); return; }
+  if (!data || data.length === 0) {
+    const pesan = keyword ? `📭 Tidak ditemukan materi dengan kata kunci "<b>${keyword}</b>".` : "📭 Belum ada materi yang tersedia.";
+    await replyTelegram(chatId, pesan);
     return;
   }
 
-  const status = data.is_active ? "🟢 DIBUKA" : "🔴 DITUTUP";
-  const kode = data.is_active
-    ? `\n🔑 Kode Akses: <code>${data.kode_akses || "-"}</code>`
-    : "";
-
-  await replyTelegram(
-    chatId,
-    `🚪 <b>STATUS ABSENSI</b>\n\nStatus: <b>${status}</b>${kode}`
-  );
+  let text = keyword ? `📂 <b>HASIL PENCARIAN: "${keyword}"</b>\n\n` : `📂 <b>MATERI TERBARU</b>\n\n`;
+  data.forEach((m, i) => {
+    text += `${i + 1}. [${m.mk_nama}] <b>${m.judul}</b>\n` +
+      ` 🔗 <a href="${m.file_url}">Buka Materi</a>\n\n`;
+  });
+  await replyTelegram(chatId, text);
 }
 
 // ── Main POST Handler ──────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-
-    // Telegram mengirim update berupa object "message"
     const message = body?.message;
     if (!message) return NextResponse.json({ ok: true });
 
     const chatId = message.chat?.id;
     const text: string = message.text || "";
 
-    // Ambil command (misal "/jadwal@NamaBotku" → "/jadwal")
-    const command = text.split("@")[0].trim().toLowerCase();
+    const parts = text.split(" ");
+    const command = parts[0].split("@")[0].trim().toLowerCase();
+    const args = parts.slice(1).join(" ").trim();
 
     switch (command) {
       case "/start":
@@ -216,8 +198,10 @@ export async function POST(req: NextRequest) {
       case "/absen":
         await handleAbsen(chatId);
         break;
+      case "/materi":
+        await handleMateri(chatId, args);
+        break;
       default:
-        // Diam saja jika bukan command yang dikenal — supaya tidak spam grup
         break;
     }
 
@@ -228,7 +212,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Telegram hanya kirim POST, tolak method lain
 export async function GET() {
   return NextResponse.json({ status: "Webhook aktif ✅" });
 }

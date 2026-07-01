@@ -1,16 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/reminder",
-      "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/cron/reminder",
-      "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/siamik",
-      "schedule": "*/30 * * * *"
+      "path": "/api/webhook?cron=all_tasks",
+      "schedule": "0 0 * * *"
     }
   ]
 }

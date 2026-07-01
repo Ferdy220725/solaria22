@@ -36,6 +36,68 @@ function formatWIB(dateString: string) {
   } catch { return dateString; }
 }
 
+// ── Logic: Cron Job Harian Gabungan (Pengingat Tugas + Cek Siamik) ─────────
+async function handleCronHarian() {
+  try {
+    console.log("[Cron] Memulai eksekusi tugas harian gabungan...");
+    const TARGET_CHAT_ID = process.env.TELEGRAM_CLASS_CHAT_ID || "";
+    if (!TARGET_CHAT_ID) {
+      console.log("[Cron] Error: TELEGRAM_CLASS_CHAT_ID belum dikonfigurasi.");
+      return;
+    }
+
+    const now = new Date();
+
+    // ── BAGIAN 1: PENGINGAT TUGAS OTOMATIS ──
+    // Ambil tugas perkuliahan aktif terdekat
+    const { data: tugasKuliah } = await supabase
+      .from("tugas_perkuliahan")
+      .select("*")
+      .gte("deadline", now.toISOString())
+      .order("deadline", { ascending: true })
+      .limit(5);
+
+    if (tugasKuliah && tugasKuliah.length > 0) {
+      let teksReminder = `⏰ <b>PENGINGAT TUGAS KULIAH HARI INI</b> ⏰\n\n`;
+      tugasKuliah.forEach((t, i) => {
+        teksReminder += `${i + 1}. [${t.mk_nama || "-"}] <b>${t.judul_tugas}</b>\n ⏰ Deadline: ${formatWIB(t.deadline)}\n\n`;
+      });
+      await replyTelegram(TARGET_CHAT_ID, teksReminder);
+    }
+
+    // ── BAGIAN 2: JALUR CEK INFO SIAMIK ──
+    const { data: infoSiamik, error: siamikErr } = await supabase
+      .from("siamik_news") // Sesuaikan dengan nama tabel Siamik milikmu
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!siamikErr && infoSiamik && !infoSiamik.sudah_dikirim) {
+      const pesanSiamik = 
+        `🔔 <b>INFO TERBARU SIAMIK HARI INI</b> 🔔\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `📌 <b>Judul:</b> ${infoSiamik.judul}\n` +
+        `📅 <b>Tanggal:</b> ${formatWIB(infoSiamik.created_at)}\n\n` +
+        `📝 <b>Isi Pengumuman:</b>\n${infoSiamik.isi_pengumuman || "-"}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `👉 <i>Silakan cek akun Siamik masing-masing untuk info lebih lanjut!</i>`;
+      
+      await replyTelegram(TARGET_CHAT_ID, pesanSiamik);
+
+      // Tandai di database agar tidak terjadi spam info yang sama keesokan harinya
+      await supabase
+        .from("siamik_news")
+        .update({ sudah_dikirim: true })
+        .eq("id", infoSiamik.id);
+    }
+
+    console.log("[Cron] Semua tugas harian selesai diproses.");
+  } catch (err) {
+    console.error("[Cron Error] Gagal menjalankan tugas harian:", err);
+  }
+}
+
 // ── Command Handlers ──────────────────────────────────────────────────────
 
 async function handleHelp(chatId: number | string) {
@@ -132,6 +194,13 @@ async function handleMateri(chatId: number | string, keyword: string) {
 // ── Main POST Handler ──────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
+    // PROTEKSI & LOGIKA INTERSEPSI UNTUK CRON JOB VERCEL VIA POST REQUEST
+    const { searchParams } = new URL(req.url);
+    if (searchParams.get("cron") === "all_tasks") {
+      await handleCronHarian();
+      return NextResponse.json({ ok: true, message: "Cron Job harian sukses diproses via POST." });
+    }
+
     const body = await req.json();
     const message = body?.message;
     if (!message) return NextResponse.json({ ok: true });
@@ -166,7 +235,6 @@ export async function POST(req: NextRequest) {
       case "/materi":
         await handleMateri(chatId, args);
         break;
-      // TAMBAHKAN INI AGAR /materi_cari merespons
       case "/materi_cari":
         await replyTelegram(chatId, "💡 Tips: Ketik /materi [kata kunci] untuk mencari materi.");
         break;
@@ -181,4 +249,15 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() { return NextResponse.json({ status: "Webhook aktif ✅" }); }
+// ── Main GET Handler ───────────────────────────────────────────────────────
+export async function GET(req: NextRequest) { 
+  const { searchParams } = new URL(req.url);
+  
+  // Deteksi jika Cron Job dipanggil menggunakan metode GET
+  if (searchParams.get("cron") === "all_tasks") {
+    await handleCronHarian();
+    return NextResponse.json({ status: "Cron Job harian sukses diproses via GET ✅" });
+  }
+
+  return NextResponse.json({ status: "Webhook aktif ✅" }); 
+}

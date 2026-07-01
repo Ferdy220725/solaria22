@@ -2,11 +2,15 @@
   "crons": [
     {
       "path": "/api/cron/reminder",
-      "schedule": "0 2 * * *"
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/cron/reminder",
-      "schedule": "0 5 * * *"
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/siamik",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

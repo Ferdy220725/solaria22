@@ -29,11 +29,24 @@ export default function ModePresentasi({
   const [controlsVisible, setControlsVisible] = useState(true);
 
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channelRef = useRef<any>(null);
+
+  // Refs supaya handler broadcast selalu baca nilai TERBARU, bukan nilai "beku" dari mount pertama
+  const slideRef = useRef(slide);
+  const totalPagesRef = useRef(totalPages);
+
+  useEffect(() => {
+    slideRef.current = slide;
+  }, [slide]);
+
+  useEffect(() => {
+    totalPagesRef.current = totalPages;
+  }, [totalPages]);
 
   const goToSlide = useCallback(
     async (n: number, broadcast = true) => {
       if (!pdfRef.current) return;
-      const clamped = Math.min(Math.max(n, 1), totalPages);
+      const clamped = Math.min(Math.max(n, 1), totalPagesRef.current);
       setSlide(clamped);
       if (canvasRef.current) {
         await renderPageToCanvas(pdfRef.current, clamped, canvasRef.current, 2);
@@ -51,10 +64,13 @@ export default function ModePresentasi({
         });
       }
     },
-    [totalPages, kode]
+    [kode]
   );
 
-  const channelRef = useRef<any>(null);
+  const goToSlideRef = useRef(goToSlide);
+  useEffect(() => {
+    goToSlideRef.current = goToSlide;
+  }, [goToSlide]);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -64,7 +80,6 @@ export default function ModePresentasi({
     }
   }, []);
 
-  // Tampilkan kontrol sementara, lalu auto-hide lagi kalau sedang fullscreen dan idle
   const showControlsTemporarily = useCallback(() => {
     setControlsVisible(true);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
@@ -88,7 +103,6 @@ export default function ModePresentasi({
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, [showControlsTemporarily]);
 
-  // Deteksi gerakan mouse / sentuhan untuk memunculkan kontrol lagi saat fullscreen
   useEffect(() => {
     if (!isFullscreen) return;
 
@@ -129,6 +143,7 @@ export default function ModePresentasi({
       const pdf = await loadPdf(item.file_url);
       pdfRef.current = pdf;
       setTotalPages(pdf.numPages);
+      totalPagesRef.current = pdf.numPages; // langsung update ref juga, tidak nunggu re-render
       if (canvasRef.current) {
         await renderPageToCanvas(pdf, 1, canvasRef.current, 2);
       }
@@ -144,13 +159,18 @@ export default function ModePresentasi({
       .on("broadcast", { event: EVENT_NAME }, ({ payload }) => {
         const ev = payload as PresentasiEvent;
         if (ev.type === "join") {
+          // Selalu pakai nilai TERBARU dari ref, bukan closure lama
           channel.send({
             type: "broadcast",
             event: EVENT_NAME,
-            payload: { type: "state_sync", slide, totalPages },
+            payload: {
+              type: "state_sync",
+              slide: slideRef.current,
+              totalPages: totalPagesRef.current,
+            },
           });
         } else if (ev.type === "nav") {
-          goToSlide(slide + ev.direction);
+          goToSlideRef.current(slideRef.current + ev.direction);
         } else if (ev.type === "pointer_move") {
           setPointer({ x: ev.x, y: ev.y });
         } else if (ev.type === "pointer_hide") {

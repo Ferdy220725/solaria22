@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { loadPdf, renderPageToCanvas } from "@/lib/pdfRender";
 import { channelName, EVENT_NAME, PresentasiEvent } from "@/lib/presentasiChannel";
-import { ChevronLeft, ChevronRight, X, Maximize, Minimize } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Maximize, Minimize, QrCode } from "lucide-react";
 
 export default function ModePresentasi({
   params,
@@ -23,7 +23,7 @@ export default function ModePresentasi({
   const [slide, setSlide] = useState(1);
   const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [showQrBig, setShowQrBig] = useState(false);
+  const [showQrOverlay, setShowQrOverlay] = useState(false);
   const [namaSesi, setNamaSesi] = useState<string>("");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -149,7 +149,7 @@ export default function ModePresentasi({
       }
 
       const url = `${window.location.origin}/presentasi/remote/${kode}/${itemId}`;
-      setQrDataUrl(await QRCode.toDataURL(url, { margin: 1, width: 220 }));
+      setQrDataUrl(await QRCode.toDataURL(url, { margin: 1, width: 400 }));
     })();
 
     const channel = supabase.channel(channelName(kode));
@@ -207,40 +207,27 @@ export default function ModePresentasi({
       if (e.key === "ArrowRight") goToSlide(slide + 1);
       if (e.key === "ArrowLeft") goToSlide(slide - 1);
       if (e.key === "f" || e.key === "F") toggleFullscreen();
-      if (e.key === "Escape" && !document.fullscreenElement) handleSelesai();
+      if (e.key === "Escape") {
+        if (showQrOverlay) {
+          setShowQrOverlay(false);
+        } else if (!document.fullscreenElement) {
+          handleSelesai();
+        }
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slide, totalPages]);
+  }, [slide, totalPages, showQrOverlay]);
 
   const hideUi = isFullscreen && !controlsVisible;
 
   return (
-    <div className="fixed inset-0 bg-black flex flex-col">
-      {/* Bar atas: nama sesi + tombol fullscreen */}
-      <div
-        className={`bg-[#2b2b2b] text-white px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 transition-all duration-300 ${
-          hideUi ? "opacity-0 -translate-y-full pointer-events-none" : "opacity-100 translate-y-0"
-        }`}
-      >
-        <span className="font-semibold text-sm sm:text-base truncate">
-          {namaSesi || "Sesi Presentasi"}
-        </span>
-        <button
-          onClick={toggleFullscreen}
-          className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-white shrink-0 ml-3"
-        >
-          {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-          <span className="hidden sm:inline">
-            {isFullscreen ? "Keluar layar penuh" : "Layar penuh"}
-          </span>
-        </button>
-      </div>
-
-      {/* Area slide */}
-      <div className="relative flex-1 flex items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 bg-black">
+      {/* Area slide — SELALU full height & width, tidak dipengaruhi bar atas */}
+      <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
         <canvas ref={canvasRef} className="max-h-full max-w-full shadow-2xl" />
+
         {pointer && (
           <div
             className="absolute w-5 h-5 rounded-full bg-red-500/70 border-2 border-red-600 pointer-events-none -translate-x-1/2 -translate-y-1/2"
@@ -248,9 +235,41 @@ export default function ModePresentasi({
           />
         )}
 
+        {/* Bar atas: nama sesi + tombol QR + tombol fullscreen, melayang di atas slide */}
+        <div
+          className={`absolute top-0 left-0 right-0 bg-[#2b2b2b]/95 backdrop-blur text-white px-4 sm:px-6 py-3 flex items-center justify-between z-20 transition-all duration-300 ${
+            hideUi ? "opacity-0 -translate-y-full pointer-events-none" : "opacity-100 translate-y-0"
+          }`}
+        >
+          <span className="font-semibold text-sm sm:text-base truncate">
+            {namaSesi || "Sesi Presentasi"}
+          </span>
+
+          <div className="flex items-center gap-4 sm:gap-5 shrink-0 ml-3">
+            {qrDataUrl && (
+              <button
+                onClick={() => setShowQrOverlay(true)}
+                className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-white"
+              >
+                <QrCode size={16} />
+                <span className="hidden sm:inline">Tampilkan QR</span>
+              </button>
+            )}
+            <button
+              onClick={toggleFullscreen}
+              className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-white"
+            >
+              {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+              <span className="hidden sm:inline">
+                {isFullscreen ? "Keluar layar penuh" : "Layar penuh"}
+              </span>
+            </button>
+          </div>
+        </div>
+
         {/* Kontrol bawah */}
         <div
-          className={`absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-4 bg-white/90 rounded-full px-3 sm:px-5 py-2 sm:py-3 shadow-xl max-w-[95vw] transition-all duration-300 ${
+          className={`absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-4 bg-white/90 rounded-full px-3 sm:px-5 py-2 sm:py-3 shadow-xl max-w-[95vw] z-20 transition-all duration-300 ${
             hideUi ? "translate-y-24 opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
           }`}
         >
@@ -278,26 +297,35 @@ export default function ModePresentasi({
             <X size={16} /> <span className="hidden sm:inline">Selesai</span>
           </button>
         </div>
+      </div>
 
-        {/* QR code pojok kanan atas area slide */}
-        {qrDataUrl && (
-          <button
-            onClick={() => setShowQrBig((v) => !v)}
-            className={`absolute top-4 sm:top-6 right-4 sm:right-6 bg-white rounded-2xl p-2 shadow-xl z-10 transition-all duration-300 ${
-              hideUi ? "opacity-0 -translate-y-4 pointer-events-none" : "opacity-100 translate-y-0"
-            }`}
+      {/* Overlay QR besar — muncul saat tombol "Tampilkan QR" diklik */}
+      {showQrOverlay && qrDataUrl && (
+        <div
+          className="fixed inset-0 z-30 bg-black/85 backdrop-blur-sm flex items-center justify-center"
+          onClick={() => setShowQrOverlay(false)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center gap-4 max-w-[90vw]"
+            onClick={(e) => e.stopPropagation()}
           >
             <img
               src={qrDataUrl}
               alt="Scan untuk remote"
-              className={showQrBig ? "w-40 h-40 sm:w-64 sm:h-64" : "w-14 h-14 sm:w-20 sm:h-20"}
+              className="w-64 h-64 sm:w-96 sm:h-96 object-contain"
             />
-            <p className="text-[9px] sm:text-[10px] text-center text-slate-500 mt-1">
-              Scan buat remote
+            <p className="text-sm sm:text-base text-slate-600 font-medium text-center">
+              Scan QR ini untuk jadi remote presentasi
             </p>
-          </button>
-        )}
-      </div>
+            <button
+              onClick={() => setShowQrOverlay(false)}
+              className="flex items-center gap-2 bg-[#800020] text-white font-bold text-sm px-5 py-2.5 rounded-full hover:opacity-90 transition"
+            >
+              <X size={16} /> Tutup QR
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -20,12 +20,32 @@ export default function Navbar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [shouldShow, setShouldShow] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     setShouldShow(true);
   }, [pathname]);
 
-  if (!shouldShow) return null;
+  // Sembunyikan navbar SEPENUHNYA saat browser dalam mode fullscreen
+  // (misalnya saat mode presentasi layar penuh sedang aktif)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fsElement =
+        document.fullscreenElement || (document as any).webkitFullscreenElement;
+      setIsFullscreen(!!fsElement);
+      if (fsElement) setIsOpen(false); // tutup submenu juga kalau lagi kebuka
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange); // Safari lama
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  if (!shouldShow || isFullscreen) return null;
 
   const menuItems = [
     { id: "m1", name: "Home", href: "/", icon: <LayoutDashboard size={20} /> },

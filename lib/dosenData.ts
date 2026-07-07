@@ -81,6 +81,7 @@ export const dataDosen: Dosen[] = [
   { nama: "Dr. Ir. Indra Tjahaja Amir, M.P.", jabatanFungsional: "Lektor", jabatanStruktural: "Dosen Tetap", prodi: "Agribisnis", email: "indra_ta@upnjatim.ac.id", wa: "0898218311" },
   { nama: "Dr. Ir. Eko Nurhadi, M.S.", jabatanFungsional: "Lektor", jabatanStruktural: "Dosen NIDK", prodi: "Agribisnis", email: "ekonhadi@yahoo.com", wa: "08123502912" },
   { nama: "Laksmi Diana, S.S., M.Pd.", jabatanFungsional: "Asisten Ahli", jabatanStruktural: "Dosen Tetap", prodi: "Umum", email: "laksmidiana.agribis@upnjatim.ac.id", wa: "081230484435" },
+  { nama: "Nur Meili Zakiyah, S.Pd., M.Biotek.", jabatanFungsional: "Tenaga Pengajar", jabatanStruktural: "Dosen Tetap", prodi: "Agroteknologi", email: "", wa: "085785409326" },
   { nama: "Dr. Ir. Arika Purnawati, M.P.", jabatanFungsional: "Lektor", jabatanStruktural: "Dosen Tetap", prodi: "Agroteknologi", email: "", wa: "" },
   { nama: "Ir. Setyo Parsudi, M.P.", jabatanFungsional: "Lektor Kepala", jabatanStruktural: "Dosen Luar Biasa", prodi: "Agribisnis", email: "", wa: "" },
   { nama: "Dr. Ir. Taufiq Setyadi, M.P.", jabatanFungsional: "Tenaga Pengajar", jabatanStruktural: "Dosen NIDK", prodi: "Agroteknologi", email: "", wa: "" },

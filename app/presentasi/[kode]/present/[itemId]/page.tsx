@@ -27,6 +27,7 @@ export default function ModePresentasi({
   const [namaSesi, setNamaSesi] = useState<string>("");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [blank, setBlank] = useState(false);
 
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<any>(null);
@@ -34,6 +35,7 @@ export default function ModePresentasi({
   // Refs supaya handler broadcast selalu baca nilai TERBARU, bukan nilai "beku" dari mount pertama
   const slideRef = useRef(slide);
   const totalPagesRef = useRef(totalPages);
+  const blankRef = useRef(blank);
 
   useEffect(() => {
     slideRef.current = slide;
@@ -42,6 +44,10 @@ export default function ModePresentasi({
   useEffect(() => {
     totalPagesRef.current = totalPages;
   }, [totalPages]);
+
+  useEffect(() => {
+    blankRef.current = blank;
+  }, [blank]);
 
   const goToSlide = useCallback(
     async (n: number, broadcast = true) => {
@@ -167,14 +173,19 @@ export default function ModePresentasi({
               type: "state_sync",
               slide: slideRef.current,
               totalPages: totalPagesRef.current,
+              blank: blankRef.current,
             },
           });
         } else if (ev.type === "nav") {
           goToSlideRef.current(slideRef.current + ev.direction);
+        } else if (ev.type === "goto") {
+          goToSlideRef.current(ev.slide);
         } else if (ev.type === "pointer_move") {
           setPointer({ x: ev.x, y: ev.y });
         } else if (ev.type === "pointer_hide") {
           setPointer(null);
+        } else if (ev.type === "blank") {
+          setBlank(ev.on);
         }
       })
       .subscribe();
@@ -224,6 +235,9 @@ export default function ModePresentasi({
 
   return (
     <div className="fixed inset-0 bg-black">
+      {/* Overlay Blank Screen — nutup total tampilan slide, mirip mode "B" di PowerPoint */}
+      {blank && <div className="fixed inset-0 bg-black z-40" />}
+
       {/* Area slide — SELALU full height & width, tidak dipengaruhi bar atas */}
       <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
         <canvas ref={canvasRef} className="max-h-full max-w-full shadow-2xl" />

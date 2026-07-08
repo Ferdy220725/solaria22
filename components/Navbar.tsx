@@ -13,6 +13,7 @@ import {
   Sprout,
   CalendarDays,
   MonitorPlay,
+  Info,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -61,6 +62,7 @@ export default function Navbar() {
       isExternal: true,
     },
     { id: "m4", name: "Izin", href: "/perizinan", icon: <FileText size={20} /> },
+    { id: "m_tentang", name: "Tentang", href: "/tentang", icon: <Info size={20} /> },
     { id: "m5", name: "Admin", href: "/admin", icon: <UserCog size={20} /> },
   ];
 

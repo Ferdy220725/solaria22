@@ -25,12 +25,21 @@ export async function updateSession(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const publicPaths = ['/login', '/set-password']
+  // Menambahkan /auth/callback agar token email bisa diproses
+  const publicPaths = ['/login', '/set-password', '/auth/callback'] 
   const isPublicPath = publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))
 
+  // Jika user belum login dan mencoba akses halaman privat, arahkan ke login
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
+
+  // Jika user sudah login dan mencoba ke halaman login, arahkan ke dashboard/home
+  if (user && (request.nextUrl.pathname === '/login')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/' 
     return NextResponse.redirect(url)
   }
 

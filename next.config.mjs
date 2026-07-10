@@ -1,14 +1,12 @@
+import path from "path";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // --- TAMBAHKAN BAGIAN INI (Wajib!) ---
-  typescript: {
-    // Ini jurus pamungkas buat paksa build jalan terus walau ada error tipe data
-    ignoreBuildErrors: true,
+  turbopack: {
+    root: path.resolve(process.cwd()),
   },
-  // -------------------------------------
-  eslint: {
-    // Mengabaikan error linting saat build
-    ignoreDuringBuilds: true,
+  typescript: {
+    ignoreBuildErrors: true,
   },
 };
 

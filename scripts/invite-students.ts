@@ -36,8 +36,9 @@ async function inviteAllStudents() {
           nama: s.nama, 
           npm: s.npm 
         },
-        // WAJIB: Arahkan ke callback agar sesi tersimpan di browser
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        // Arahkan langsung ke halaman set-password
+        // (link undangan Supabase pakai token di hash URL, bukan ?code=, jadi tidak perlu lewat /auth/callback)
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/set-password`,
       });
 
       if (error) {

@@ -37,7 +37,6 @@ export default function Dashboard() {
   const [zoomMeetings, setZoomMeetings] = useState<any[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // STATE RIWAYAT BUKTI
   const [riwayatBukti, setRiwayatBukti] = useState<Record<string, BuktiTugas>>({});
 
   const supabase = createClient();
@@ -69,17 +68,19 @@ export default function Dashboard() {
   }, [showLeaderboard]);
 
   const fetchDataAndSync = async () => {
-    const { data } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
-    if (data) setTugas(data as Tugas[]);
-
-    const { data: zData } = await supabase.from('zoom_meetings').select('*').eq('is_active', true).order('waktu_mulai', { ascending: true });
-    if (zData) setZoomMeetings(zData);
-
     const savedName = localStorage.getItem('nama_user_solaria') || 'Sobat Agrotek';
     setDisplayName(`${savedName.trim().split(' ')[0]} 🍃`);
-    
-    // SINKRONISASI CLOUD DENGAN SUPABASE AUTH
-    const { data: { user } } = await supabase.auth.getUser();
+
+    const [tugasRes, zoomRes, userRes] = await Promise.all([
+      supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true }),
+      supabase.from('zoom_meetings').select('*').eq('is_active', true).order('waktu_mulai', { ascending: true }),
+      supabase.auth.getUser(),
+    ]);
+
+    if (tugasRes.data) setTugas(tugasRes.data as Tugas[]);
+    if (zoomRes.data) setZoomMeetings(zoomRes.data);
+
+    const user = userRes.data.user;
     let currentCompletedTasks = JSON.parse(localStorage.getItem('agrotek_completed_tasks') || '[]');
 
     if (user) {
@@ -96,7 +97,7 @@ export default function Dashboard() {
           buktiMap[b.tugas_id] = b;
           completedIdsFromDB.push(b.tugas_id);
         });
-        
+
         setRiwayatBukti(buktiMap);
         currentCompletedTasks = completedIdsFromDB;
         setCompletedTaskIds(completedIdsFromDB);
@@ -106,11 +107,13 @@ export default function Dashboard() {
       setCompletedTaskIds(currentCompletedTasks);
     }
 
-    await supabase.from('user_progress').upsert({
-      nama_user: savedName, 
-      tugas_selesai: currentCompletedTasks.length, 
-      last_update: new Date()
-    }, { onConflict: 'nama_user' });
+    supabase.from('user_progress').upsert({
+      nama_user: savedName,
+      tugas_selesai: currentCompletedTasks.length,
+      last_update: new Date(),
+    }, { onConflict: 'nama_user' }).then(({ error }) => {
+      if (error) console.error('Gagal update user_progress:', error.message);
+    });
   };
 
   const checkDeadlineTrigger = async () => {
@@ -230,7 +233,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#fcfcfc] font-sans pb-20 overflow-x-hidden">
-      {/* LEADERBOARD OVERLAY */}
       {showLeaderboard && (
         <div className="fixed inset-0 z-[999] bg-[#800020] flex items-center justify-center p-6 text-white animate-in fade-in duration-500">
           <div className="max-w-2xl w-full text-center">
@@ -250,14 +252,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* EXAM NOTIFICATION */}
       {(isETS || isEAS) && (
         <div className="sticky top-0 z-[60] bg-red-600 text-white py-3 border-b-4 border-yellow-400 text-center font-black uppercase text-xs md:text-sm tracking-widest shadow-xl px-4">
           🚨 MINGGU {isETS ? 'ETS' : 'EAS'} SEDANG BERLANGSUNG! SEMANGAT! 🚨
         </div>
       )}
 
-      {/* HEADER BANNER */}
       <div className="relative w-full">
         <div className="relative w-full h-[220px] md:h-[300px] overflow-hidden shadow-lg border-b-8 border-slate-300">
           <img 
@@ -279,7 +279,6 @@ export default function Dashboard() {
 
       <div className={`p-4 md:p-10 max-w-7xl mx-auto transition-all ${showLeaderboard ? 'blur-2xl' : ''}`}>
         
-        {/* QUICK STATS & LINKS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           <button 
             onClick={() => router.push('/absensi')} 
@@ -300,7 +299,6 @@ export default function Dashboard() {
             <p className="font-black uppercase text-xs text-slate-800">{todayName}, {todayStr}</p>
           </div>
 
-          {/* ZOOM SECTION */}
           <div className="bg-white p-4 rounded-[35px] shadow-xl border-b-8 border-blue-600 border-2 border-slate-200 flex flex-col h-full max-h-[140px] overflow-y-auto no-scrollbar relative">
             <h3 className="font-black uppercase text-[10px] text-blue-600 mb-2 tracking-widest flex items-center justify-center gap-2 sticky top-0 bg-white z-10 pb-1">
               <span className="animate-pulse">🔴</span> LIVE ZOOM
@@ -337,7 +335,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* TASK SECTION */}
         <div className="w-full bg-white p-6 md:p-8 rounded-[40px] shadow-xl border-t-[10px] border-[#004d40] border-2 border-slate-200">
           <div className="flex gap-2 mb-8 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
             <button 
@@ -356,7 +353,6 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-1 gap-4">
             {activeTab === 'perlu dikerjakan' ? (
-              // --- TAMPILAN TAB DAFTAR TUGAS (MENGGUNAKAN ACCORDION CARDS) ---
               displayedTugas.length > 0 ? displayedTugas.map((t) => {
                 const isLewat = new Date().getTime() > new Date(t.deadline).getTime();
 
@@ -410,9 +406,7 @@ export default function Dashboard() {
                 </div>
               )
             ) : (
-              // --- TAMPILAN BARU: TAB SUDAH SELESAI (DI-GROUP PER MATA KULIAH) ---
               (() => {
-                // 1. Kelompokkan tugas yang selesai berdasarkan mk_nama
                 const groupedTugas: Record<string, Tugas[]> = {};
                 
                 tugas.filter(t => completedTaskIds.includes(t.id)).forEach(t => {
@@ -433,10 +427,8 @@ export default function Dashboard() {
                   );
                 }
 
-                // 2. Render List yang rapi per Mata Kuliah
                 return matkulList.map((mkNama) => (
                   <div key={mkNama} className="mb-6 bg-green-50/40 border-2 border-green-100 rounded-[35px] p-6 shadow-sm">
-                    {/* Header Nama Mata Kuliah */}
                     <h4 className="text-sm font-black uppercase tracking-wider text-green-800 mb-4 flex items-center gap-2 bg-green-100/60 px-4 py-2 rounded-full w-fit">
                       📚 Matkul: {mkNama} 
                       <span className="bg-green-700 text-white text-[10px] px-2 py-0.5 rounded-full">
@@ -444,7 +436,6 @@ export default function Dashboard() {
                       </span>
                     </h4>
 
-                    {/* Tabel / List Tugas di dalam matkul tersebut */}
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
                         <thead>

@@ -8,92 +8,114 @@ import {
   FlaskConical,
   FileText,
   UserCog,
-  Menu,
-  X,
   CalendarDays,
   MonitorPlay,
   Info,
+  Shuffle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const menuItems = [
+  { id: "m1", name: "Home", href: "/", icon: LayoutDashboard, color: "#800020" },
+  { id: "m2", name: "Materi", href: "/materi", icon: BookOpen, color: "#2563eb" },
+  { id: "m3", name: "Praktikum", href: "/praktikum", icon: FlaskConical, color: "#16a34a" },
+  { id: "m_jadwal", name: "Jadwal", href: "/jadwal-sistem/list", icon: CalendarDays, color: "#d97706" },
+  { id: "m_presentasi", name: "Presentasi", href: "/presentasi", icon: MonitorPlay, color: "#9333ea" },
+  { id: "m4", name: "Izin", href: "/perizinan", icon: FileText, color: "#0891b2" },
+  { id: "m_acak", name: "Acak Kelompok", href: "/acak-kelompok", icon: Shuffle, color: "#e11d48" },
+  { id: "m_tentang", name: "Tentang", href: "/tentang", icon: Info, color: "#4338ca" },
+  { id: "m5", name: "Admin", href: "/admin", icon: UserCog, color: "#334155" },
+];
+
+const BASE = 44; // ukuran ikon normal (px)
+const MAX = 68; // ukuran ikon saat jadi fokus (px)
+const RANGE = 110; // radius pengaruh magnify (px)
 
 export default function Navbar() {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [scales, setScales] = useState<number[]>(menuItems.map(() => 1));
   const [shouldShow, setShouldShow] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => setShouldShow(true), []);
+
+  const updateScales = () => {
+    const container = containerRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const center = containerRect.left + containerRect.width / 2;
+
+    const next = itemRefs.current.map((el) => {
+      if (!el) return 1;
+      const rect = el.getBoundingClientRect();
+      const itemCenter = rect.left + rect.width / 2;
+      const dist = Math.abs(itemCenter - center);
+      const t = Math.max(0, 1 - dist / RANGE);
+      const size = BASE + (MAX - BASE) * t;
+      return size / BASE;
+    });
+    setScales(next);
+  };
 
   useEffect(() => {
-    setShouldShow(true);
-  }, [pathname]);
-
-  // Sembunyikan navbar SEPENUHNYA saat browser dalam mode fullscreen
-  // (misalnya saat mode presentasi layar penuh sedang aktif)
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const fsElement =
-        document.fullscreenElement || (document as any).webkitFullscreenElement;
-      setIsFullscreen(!!fsElement);
-      if (fsElement) setIsOpen(false); // tutup submenu juga kalau lagi kebuka
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange); // Safari lama
-
+    updateScales();
+    const container = containerRef.current;
+    if (!container) return;
+    container.addEventListener("scroll", updateScales, { passive: true });
+    window.addEventListener("resize", updateScales);
     return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      container.removeEventListener("scroll", updateScales);
+      window.removeEventListener("resize", updateScales);
     };
   }, []);
 
-  if (!shouldShow || isFullscreen) return null;
-
-  const menuItems = [
-    { id: "m1", name: "Home", href: "/", icon: <LayoutDashboard size={20} /> },
-    { id: "m2", name: "Materi", href: "/materi", icon: <BookOpen size={20} /> },
-    { id: "m3", name: "Praktikum", href: "/praktikum", icon: <FlaskConical size={20} /> },
-    { id: "m_jadwal", name: "Jadwal", href: "/jadwal-sistem/list", icon: <CalendarDays size={20} /> },
-    { id: "m_presentasi", name: "Presentasi", href: "/presentasi", icon: <MonitorPlay size={20} /> },
-    { id: "m4", name: "Izin", href: "/perizinan", icon: <FileText size={20} /> },
-    { id: "m_tentang", name: "Tentang", href: "/tentang", icon: <Info size={20} /> },
-    { id: "m5", name: "Admin", href: "/admin", icon: <UserCog size={20} /> },
-  ];
+  if (!shouldShow) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[9999] flex flex-col items-end gap-3 pointer-events-none">
+    <div className="fixed bottom-4 left-0 right-0 z-[9999] flex justify-center px-3 pointer-events-none">
       <div
-        className={`flex flex-col gap-2 mb-2 transition-all duration-300 transform origin-bottom ${
-          isOpen
-            ? "scale-100 opacity-100 translate-y-0 pointer-events-auto"
-            : "scale-0 opacity-0 translate-y-10 pointer-events-none"
-        }`}
+        ref={containerRef}
+        className="pointer-events-auto flex items-end gap-3 overflow-x-auto no-scrollbar px-8 py-3 rounded-[28px] bg-white/70 dark:bg-[#1a1a1a]/70 backdrop-blur-xl border border-white/40 dark:border-white/10 shadow-2xl max-w-full snap-x snap-mandatory"
+        style={{ scrollbarWidth: "none" }}
       >
-        {menuItems.map((item) => (
-          <Link
-            key={item.id}
-            href={item.href}
-            onClick={() => setIsOpen(false)}
-            className={`flex items-center justify-end gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border pointer-events-auto ${
-              pathname === item.href
-                ? "bg-[#800020] text-white border-[#800020]"
-                : "bg-white/95 dark:bg-[#1a1a1a]/90 text-slate-600 dark:text-slate-300 border-slate-100 dark:border-white/10"
-            }`}
-          >
-            <span className="text-[10px] font-black uppercase tracking-widest">{item.name}</span>
-            <div className="p-1 rounded-lg text-inherit bg-slate-50/50 dark:bg-white/5">
-              {item.icon}
-            </div>
-          </Link>
-        ))}
+        {menuItems.map((item, i) => {
+          const Icon = item.icon;
+          const active = pathname === item.href;
+          const scale = scales[i] ?? 1;
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              ref={(el) => {
+                itemRefs.current[i] = el as unknown as HTMLDivElement;
+              }}
+              className="flex flex-col items-center shrink-0 snap-center transition-transform duration-150 ease-out"
+              style={{
+                transform: `scale(${scale}) translateY(${-(scale - 1) * 18}px)`,
+                transformOrigin: "bottom center",
+              }}
+            >
+              <div
+                className="flex items-center justify-center rounded-2xl shadow-lg transition-colors"
+                style={{
+                  width: BASE,
+                  height: BASE,
+                  backgroundColor: active ? item.color : `${item.color}CC`,
+                }}
+              >
+                <Icon color="white" size={22} />
+              </div>
+              <span
+                className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 transition-opacity"
+                style={{ opacity: scale > 1.15 ? 1 : 0 }}
+              >
+                {item.name}
+              </span>
+            </Link>
+          );
+        })}
       </div>
-
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-14 h-14 md:w-16 md:h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 pointer-events-auto active:scale-90 ${
-          isOpen ? "bg-slate-800 rotate-90" : "bg-[#800020] hover:scale-110"
-        }`}
-      >
-        {isOpen ? <X color="white" size={26} /> : <Menu color="white" size={26} />}
-      </button>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function SetPassword() {
   const [password, setPassword] = useState("");
@@ -12,15 +12,33 @@ export default function SetPassword() {
 
   const supabase = createClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    const handleSession = async () => {
+      const code = searchParams.get("code");
+
+      // Kalau ada ?code=... di URL (link dari email undangan), tukar dulu jadi session
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          setErrorMsg("Link tidak valid atau sudah kadaluarsa. Minta admin kirim ulang undangan.");
+          return;
+        }
+        setReady(true);
+        return;
+      }
+
+      // Fallback: cek kalau session sudah ada (misal user refresh halaman ini)
+      const { data } = await supabase.auth.getSession();
       if (data.session) {
         setReady(true);
       } else {
         setErrorMsg("Link tidak valid atau sudah kadaluarsa. Minta admin kirim ulang undangan.");
       }
-    });
+    };
+
+    handleSession();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

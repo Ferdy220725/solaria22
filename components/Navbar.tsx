@@ -13,6 +13,7 @@ import {
   Info,
   Shuffle,
   ClipboardCheck,
+  User,
   Menu,
   X,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const menuItems = [
   { id: "m_presentasi", name: "Presentasi", href: "/presentasi", icon: MonitorPlay },
   { id: "m4", name: "Izin", href: "/perizinan", icon: FileText },
   { id: "m_acak", name: "Acak Kelompok", href: "/acak-kelompok", icon: Shuffle },
+  { id: "m_akun", name: "Akun Saya", href: "/akun", icon: User },
   { id: "m_tentang", name: "Tentang", href: "/tentang", icon: Info },
   { id: "m5", name: "Admin", href: "/admin", icon: UserCog },
 ];

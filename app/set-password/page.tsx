@@ -1,42 +1,55 @@
 "use client";
-
 import { Suspense, useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 function SetPasswordForm() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [ready, setReady] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-
   const supabase = createClient();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
-    const handleSession = async () => {
-      const code = searchParams.get("code");
-
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          setErrorMsg("Link tidak valid atau sudah kadaluarsa. Minta admin kirim ulang undangan.");
-          return;
-        }
-        setReady(true);
-        return;
-      }
-
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        setReady(true);
+    // Tangkap error yang Supabase kirim langsung di hash fragment (misal otp_expired)
+    const hash = window.location.hash;
+    if (hash.includes("error=")) {
+      const params = new URLSearchParams(hash.substring(1));
+      const errorCode = params.get("error_code");
+      if (errorCode === "otp_expired") {
+        setErrorMsg("Link undangan sudah kadaluarsa atau sudah pernah dibuka. Minta admin kirim ulang undangan.");
       } else {
-        setErrorMsg("Link tidak valid atau sudah kadaluarsa. Minta admin kirim ulang undangan.");
+        setErrorMsg("Link tidak valid. Minta admin kirim ulang undangan.");
       }
-    };
+      return;
+    }
 
-    handleSession();
+    // Dengarkan event auth: Supabase otomatis proses token dari hash lalu fire event ini
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        if (session) setReady(true);
+      }
+    });
+
+    // Fallback: cek barangkali session udah ke-set duluan sebelum listener terpasang
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setReady(true);
+    });
+
+    // Kasih timeout wajar - kalau setelah beberapa detik belum ada session & belum ada error,
+    // baru dianggap link invalid
+    const timeout = setTimeout(() => {
+      setReady((r) => {
+        if (!r) setErrorMsg("Link tidak valid atau sudah kadaluarsa. Minta admin kirim ulang undangan.");
+        return r;
+      });
+    }, 4000);
+
+    return () => {
+      listener.subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,7 +62,6 @@ function SetPasswordForm() {
       alert("Password minimal 6 karakter!");
       return;
     }
-
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
       alert("Gagal mengatur password: " + error.message);
@@ -62,7 +74,6 @@ function SetPasswordForm() {
   if (errorMsg) {
     return <div className="min-h-screen flex items-center justify-center p-6 text-center">{errorMsg}</div>;
   }
-
   if (!ready) {
     return <div className="min-h-screen flex items-center justify-center">Memuat...</div>;
   }

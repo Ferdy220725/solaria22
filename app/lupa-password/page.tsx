@@ -104,12 +104,14 @@ function LupaPasswordForm() {
 
     const { error } = await supabase.auth.updateUser({ password });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       setError("Gagal mengganti password. Coba lagi beberapa saat.");
     } else {
-      router.push("/login");
+      setInfo("Password berhasil diubah! Mengarahkan ke halaman login...");
+      setTimeout(() => {
+        router.push("/login");
+      }, 1800);
     }
   };
 
@@ -238,7 +240,7 @@ function LupaPasswordForm() {
                   <input
                     type="text"
                     inputMode="numeric"
-                    placeholder="Contoh: 123456"
+                    placeholder="Contoh: 12345678"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
                     className="w-full text-sm font-semibold text-slate-700 outline-none bg-transparent tracking-widest"
@@ -277,6 +279,12 @@ function LupaPasswordForm() {
           {/* STEP 3: New Password */}
           {step === "newPassword" && (
             <form onSubmit={handleUpdatePassword} className="space-y-4">
+              {info && (
+                <p className="text-xs text-center px-3 py-2 rounded-xl bg-green-50 text-green-700">
+                  {info}
+                </p>
+              )}
+
               <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">
                   Password Baru
@@ -326,11 +334,11 @@ function LupaPasswordForm() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !!info}
                 className="w-full bg-[#800020] text-white text-sm font-bold py-3 rounded-2xl hover:bg-[#800020]/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {loading && <Loader2 size={16} className="animate-spin" />}
-                {loading ? "Menyimpan..." : "Simpan Password Baru"}
+                {(loading || !!info) && <Loader2 size={16} className="animate-spin" />}
+                {info ? "Mengarahkan..." : loading ? "Menyimpan..." : "Simpan Password Baru"}
               </button>
             </form>
           )}

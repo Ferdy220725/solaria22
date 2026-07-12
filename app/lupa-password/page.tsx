@@ -242,7 +242,7 @@ function LupaPasswordForm() {
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
                     className="w-full text-sm font-semibold text-slate-700 outline-none bg-transparent tracking-widest"
-                    maxLength={6}
+                    maxLength={8}
                     required
                   />
                 </div>

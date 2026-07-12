@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { User, Mail, IdCard, LogOut, KeyRound, Loader2 } from "lucide-react";
+import { User, Mail, IdCard, LogOut, KeyRound, Loader2, ArrowRight } from "lucide-react";
 
 export default function AkunSaya() {
   const [loading, setLoading] = useState(true);
@@ -29,7 +29,6 @@ export default function AkunSaya() {
       const user = authData.user;
       setEmail(user.email || "-");
 
-      // Ambil data profil dari tabel `profiles`, sumber utama nama & npm
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("nama, npm, created_at")
@@ -37,7 +36,6 @@ export default function AkunSaya() {
         .maybeSingle();
 
       if (profileError || !profile) {
-        // Fallback ke metadata akun kalau baris profil belum ada
         setNama(user.user_metadata?.nama || "-");
         setNpm(user.user_metadata?.npm || "-");
         setCreatedAt(
@@ -76,9 +74,7 @@ export default function AkunSaya() {
     setResetLoading(true);
     setResetMsg("");
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/lupa-password`,
-    });
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
 
     setResetLoading(false);
 
@@ -168,9 +164,15 @@ export default function AkunSaya() {
           </button>
 
           {resetMsg && (
-            <p className="text-xs text-center px-2 py-2 rounded-xl bg-slate-50 text-slate-600">
-              {resetMsg}
-            </p>
+            <div className="px-3 py-3 rounded-xl bg-slate-50 space-y-2">
+              <p className="text-xs text-center text-slate-600">{resetMsg}</p>
+              <button
+                onClick={() => router.push("/lupa-password")}
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-[#800020] py-1"
+              >
+                Masukkan Kode OTP <ArrowRight size={14} />
+              </button>
+            </div>
           )}
 
           <button

@@ -14,7 +14,7 @@
     "@ai-sdk/react": "^3.0.160",
     "@google/genai": "^2.11.0",
     "@google/generative-ai": "^0.24.1",
-    "@napi-rs/canvas": "^1.0.2",
+    "@napi-rs/canvas": "^0.1.100",
     "@supabase/auth-ui-react": "^0.4.7",
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/ssr": "^0.5.2",
@@ -44,7 +44,6 @@
     "react-signature-canvas": "^1.0.7",
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
-    "unpdf": "^1.6.2",
     "web-push": "^3.6.7",
     "zod": "^4.3.6"
   },

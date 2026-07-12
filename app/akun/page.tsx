@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { User, Mail, IdCard, LogOut, KeyRound, Loader2, ArrowRight } from "lucide-react";
+import { User, Mail, IdCard, LogOut, KeyRound, Loader2 } from "lucide-react";
 
 export default function AkunSaya() {
   const [loading, setLoading] = useState(true);
@@ -12,8 +12,6 @@ export default function AkunSaya() {
   const [npm, setNpm] = useState("");
   const [email, setEmail] = useState("");
   const [createdAt, setCreatedAt] = useState("");
-  const [resetMsg, setResetMsg] = useState("");
-  const [resetLoading, setResetLoading] = useState(false);
 
   const supabase = createClient();
   const router = useRouter();
@@ -67,22 +65,6 @@ export default function AkunSaya() {
     setLoggingOut(true);
     await supabase.auth.signOut();
     router.push("/login");
-  };
-
-  const handleResetPassword = async () => {
-    if (!email || email === "-") return;
-    setResetLoading(true);
-    setResetMsg("");
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-
-    setResetLoading(false);
-
-    if (error) {
-      setResetMsg("❌ Gagal mengirim kode reset. Coba lagi beberapa saat lagi.");
-    } else {
-      setResetMsg(`✅ Kode reset sudah dikirim ke ${email}. Cek inbox kamu.`);
-    }
   };
 
   if (loading) {
@@ -148,32 +130,17 @@ export default function AkunSaya() {
           </p>
 
           <button
-            onClick={handleResetPassword}
-            disabled={resetLoading}
-            className="w-full flex items-center gap-3 p-3 rounded-2xl border-2 border-slate-100 hover:border-[#800020]/30 transition-colors text-left disabled:opacity-50"
+            onClick={() => router.push(`/lupa-password?email=${encodeURIComponent(email)}`)}
+            className="w-full flex items-center gap-3 p-3 rounded-2xl border-2 border-slate-100 hover:border-[#800020]/30 transition-colors text-left"
           >
             <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
               <KeyRound size={18} className="text-slate-600" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-slate-700">
-                {resetLoading ? "Mengirim kode..." : "Reset Password"}
-              </p>
-              <p className="text-[11px] text-slate-400">Kirim kode reset ke email kamu</p>
+              <p className="text-sm font-bold text-slate-700">Reset Password</p>
+              <p className="text-[11px] text-slate-400">Kirim kode OTP ke email kamu</p>
             </div>
           </button>
-
-          {resetMsg && (
-            <div className="px-3 py-3 rounded-xl bg-slate-50 space-y-2">
-              <p className="text-xs text-center text-slate-600">{resetMsg}</p>
-              <button
-                onClick={() => router.push("/lupa-password")}
-                className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-[#800020] py-1"
-              >
-                Masukkan Kode OTP <ArrowRight size={14} />
-              </button>
-            </div>
-          )}
 
           <button
             onClick={handleLogout}

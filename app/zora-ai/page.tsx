@@ -1,4 +1,3 @@
-// app/zora-ai/page.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -51,7 +50,6 @@ export default function ZoraAI() {
   const [ringkasLoadingId, setRingkasLoadingId] = useState<string | null>(null);
   const [pickerError, setPickerError] = useState("");
 
-  // Step picker: null = tampilkan daftar mata kuliah, string = mata kuliah yang dipilih
   const [selectedMK, setSelectedMK] = useState<string | null>(null);
   const [mkSemesterFilter, setMkSemesterFilter] = useState<number | null>(null);
   const [semesterFilter, setSemesterFilter] = useState<number | null>(null);
@@ -64,8 +62,6 @@ export default function ZoraAI() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
 
-  // Kunci scroll halaman belakang saat modal terbuka, supaya browser mobile
-  // tidak salah fokus scroll ke halaman utama alih-alih ke dalam modal
   useEffect(() => {
     if (showPicker) {
       document.body.style.overflow = "hidden";
@@ -77,7 +73,6 @@ export default function ZoraAI() {
     };
   }, [showPicker]);
 
-  // Ambil user yang login + riwayat chatnya saat halaman dibuka
   useEffect(() => {
     const loadHistory = async () => {
       const {
@@ -103,7 +98,6 @@ export default function ZoraAI() {
           }))
         );
 
-        // Restore konteks materi terakhir yang aktif (kalau ada)
         const lastWithContext = [...data]
           .reverse()
           .find((row) => row.materi_context);
@@ -119,13 +113,12 @@ export default function ZoraAI() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Helper: simpan satu baris pesan ke Supabase (RLS otomatis pakai auth.uid())
   const saveMessage = async (
     role: "user" | "model",
     text: string,
     extra?: { materiContext?: string; materiLabel?: string }
   ) => {
-    if (!userId) return; // kalau belum login, cuma simpan di state (jaga-jaga)
+    if (!userId) return;
     const { error } = await supabase.from("zora_ai_messages").insert({
       user_id: userId,
       role,
@@ -141,7 +134,6 @@ export default function ZoraAI() {
   const openPicker = async () => {
     setShowPicker(true);
     setPickerError("");
-    // Selalu mulai dari daftar mata kuliah setiap kali dibuka
     setSelectedMK(null);
     setMkSemesterFilter(null);
     setSemesterFilter(null);
@@ -215,7 +207,6 @@ export default function ZoraAI() {
         { role: "model", text: data.summary },
       ]);
 
-      // Simpan dua baris: pesan user + ringkasan (konteks materi ikut disimpan di baris ini)
       await saveMessage("user", userText);
       await saveMessage("model", data.summary, {
         materiContext: data.konteks,
@@ -239,7 +230,6 @@ export default function ZoraAI() {
     setInput("");
     setSending(true);
 
-    // Simpan pesan user duluan, tidak perlu ditunggu (non-blocking)
     saveMessage("user", text);
 
     try {
@@ -254,7 +244,6 @@ export default function ZoraAI() {
       if (!res.ok) {
         const errText = "⚠️ " + (data.error || "Terjadi kesalahan. Coba lagi.");
         setMessages((prev) => [...prev, { role: "model", text: errText }]);
-        // Error juga disimpan biar riwayat konsisten dengan yang terlihat di layar
         saveMessage("model", errText);
       } else {
         setMessages((prev) => [...prev, { role: "model", text: data.reply }]);
@@ -269,12 +258,10 @@ export default function ZoraAI() {
     }
   };
 
-  // Semua pilihan semester yang tersedia (dari seluruh materi, dipakai untuk filter tahap 1)
   const allSemesterOptions = Array.from(
     new Set(materiList.map((m) => m.semester))
   ).sort((a, b) => a - b);
 
-  // Kelompokkan materi berdasarkan mata kuliah, sudah disaring semester dulu (kalau ada filter)
   const materiUntukGrouping = mkSemesterFilter
     ? materiList.filter((m) => m.semester === mkSemesterFilter)
     : materiList;
@@ -292,7 +279,6 @@ export default function ZoraAI() {
     }, {} as Record<string, MKGroup>)
   ).sort((a, b) => a.mk_nama.localeCompare(b.mk_nama));
 
-  // Materi di dalam mata kuliah yang sedang dipilih
   const materiDalamMK = materiList.filter((m) => m.mk_nama === selectedMK);
 
   const semesterOptionsMK = Array.from(
@@ -304,7 +290,6 @@ export default function ZoraAI() {
     .filter((m) =>
       m.judul.toLowerCase().includes(searchQuery.trim().toLowerCase())
     );
-
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -337,8 +322,11 @@ export default function ZoraAI() {
         </div>
       )}
 
-      {/* Chat area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-28">
+      {/* Chat area — padding bawah diperbesar supaya pesan terakhir tidak ketutupan input bar */}
+      <div
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+        style={{ paddingBottom: "calc(7rem + env(safe-area-inset-bottom))" }}
+      >
         {loadingHistory ? (
           <div className="flex items-center justify-center py-10">
             <Loader2 size={22} className="animate-spin text-[#800020]" />
@@ -419,8 +407,11 @@ export default function ZoraAI() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3">
+      {/* Input bar — z-index dinaikkan + padding aman untuk gesture bar HP */}
+      <div
+        className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 pt-3 z-40"
+        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+      >
         <div className="max-w-md mx-auto flex items-center gap-2">
           <button
             onClick={openPicker}
@@ -447,9 +438,9 @@ export default function ZoraAI() {
         </div>
       </div>
 
-      {/* Modal Picker Materi */}
+      {/* Modal Picker Materi — z-index paling atas */}
       {showPicker && (
-        <div className="fixed inset-0 bg-black/40 z-20 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div
             className="bg-white w-full sm:max-w-md sm:rounded-[30px] rounded-t-[30px] flex flex-col overflow-hidden"
             style={{
@@ -457,7 +448,6 @@ export default function ZoraAI() {
               maxHeight: "85dvh",
             }}
           >
-            {/* Header modal - tidak ikut discroll */}
             <div className="flex items-center justify-between p-5 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 {selectedMK && (
@@ -480,17 +470,12 @@ export default function ZoraAI() {
               </button>
             </div>
 
-            {/* SATU wadah scroll saja untuk seluruh isi body modal.
-                Sengaja tidak ditumpuk pakai flex-1 berlapis-lapis karena
-                itu yang bikin scroll gagal jalan di beberapa browser mobile. */}
             <div
               className="flex-1 overflow-y-auto overscroll-contain"
               style={{ WebkitOverflowScrolling: "touch" }}
             >
-              {/* ==== TAHAP 1: DAFTAR MATA KULIAH ==== */}
               {!selectedMK && (
                 <div>
-                  {/* Filter semester (untuk saring mata kuliah) */}
                   {allSemesterOptions.length > 1 && (
                     <div className="flex flex-wrap gap-2 px-5 pt-3 pb-1">
                       <button
@@ -561,10 +546,8 @@ export default function ZoraAI() {
                 </div>
               )}
 
-              {/* ==== TAHAP 2: DAFTAR MATERI DALAM MATA KULIAH ==== */}
               {selectedMK && (
                 <div>
-                  {/* Search box */}
                   <div className="px-5 pt-3 pb-2">
                     <div className="relative">
                       <Search
@@ -581,7 +564,6 @@ export default function ZoraAI() {
                     </div>
                   </div>
 
-                  {/* Filter semester (kalau MK ini punya lebih dari 1 semester) */}
                   {semesterOptionsMK.length > 1 && (
                     <div className="flex flex-wrap gap-2 px-5 pb-3">
                       <button
@@ -612,7 +594,6 @@ export default function ZoraAI() {
 
                   <div className="border-t border-slate-100" />
 
-                  {/* List materi */}
                   <div className="p-3">
                     {pickerError ? (
                       <p className="text-xs text-center text-red-600 py-6">{pickerError}</p>

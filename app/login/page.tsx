@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -120,6 +121,10 @@ export default function Login() {
         >
           {loading ? "Memproses..." : "Masuk Sistem 🚀"}
         </button>
+
+        <Link href="/lupa-password" className="block text-center text-xs text-slate-400 hover:text-[#800020]">
+          Lupa password?
+        </Link>
       </form>
     </div>
   );

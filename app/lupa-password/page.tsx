@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   KeyRound,
   Mail,
@@ -16,9 +16,12 @@ import {
 
 type Step = "request" | "verify" | "newPassword";
 
-export default function LupaPassword() {
+function LupaPasswordForm() {
+  const searchParams = useSearchParams();
+  const emailFromUrl = searchParams.get("email") || "";
+
   const [step, setStep] = useState<Step>("request");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(emailFromUrl);
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -334,5 +337,19 @@ export default function LupaPassword() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LupaPassword() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <Loader2 className="animate-spin text-[#800020]" size={28} />
+        </div>
+      }
+    >
+      <LupaPasswordForm />
+    </Suspense>
   );
 }

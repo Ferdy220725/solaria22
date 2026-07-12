@@ -1,10 +1,10 @@
 // app/api/zora-ai/ringkas/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { extractText, getDocumentProxy } from "unpdf";
+import { PDFParse } from "pdf-parse";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-const MAX_CHARS = 60000;
+const MAX_CHARS = 60000; // batas aman jumlah karakter yang dikirim ke AI
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,23 +28,22 @@ export async function POST(req: NextRequest) {
 
     let teks = (materi.konten_teks || "").trim();
 
+    // Kalau belum pernah diekstrak, ambil & ekstrak teks langsung dari URL PDF-nya
     if (!teks || teks.length < 50) {
-      const fileRes = await fetch(materi.file_url);
+      const parser = new PDFParse({ url: materi.file_url });
 
-      if (!fileRes.ok) {
+      try {
+        const result = await parser.getText();
+        teks = result.text.trim();
+      } catch (parseErr) {
+        console.error("Gagal parse PDF:", parseErr);
         return NextResponse.json(
-          { error: "Gagal mengambil file PDF materi ini dari server." },
+          { error: "Gagal membaca file PDF ini. Pastikan file valid dan bisa diakses publik." },
           { status: 502 }
         );
+      } finally {
+        await parser.destroy();
       }
-
-      const buffer = new Uint8Array(await fileRes.arrayBuffer());
-
-      // --- bagian yang berubah ---
-      const pdf = await getDocumentProxy(buffer);
-      const { text } = await extractText(pdf, { mergePages: true });
-      teks = text.trim();
-      // ---------------------------
 
       if (!teks || teks.length < 50) {
         return NextResponse.json(
@@ -56,6 +55,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Cache hasil ekstraksi ke Supabase supaya tidak perlu diekstrak ulang
       await supabase.from("materi").update({ konten_teks: teks }).eq("id", materiId);
     }
 
@@ -80,7 +80,7 @@ ${teksUntukAI}
 """`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+      model: "gemini-2.5-flash",
       contents: prompt,
     });
 
@@ -92,6 +92,7 @@ ${teksUntukAI}
         mk_nama: materi.mk_nama,
         semester: materi.semester,
       },
+      // dikirim balik ke frontend supaya bisa dipakai sebagai konteks chat lanjutan
       konteks: teksUntukAI,
     });
   } catch (err) {

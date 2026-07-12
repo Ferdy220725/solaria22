@@ -161,14 +161,6 @@ const sambutanList = [
   "Hai Class C! 🌱 Zora standby nih, mau tanya jadwal, tugas, atau materi?",
   "Halo halo! 😊 Zora di sini, tinggal bilang aja butuh apa.",
   "Yoo! 🚀 Zora online, siap bantu urusan kuliah kalian.",
-  "Iya pung mau apa?😒",
-  "Ya buruan paan?😒",
-  "Kenapa manggil - manggil?😒",
-  "Berisik ah! mau apa?",
-  "Hai my baby belangtelon, kamu perlu apa?",
-  "Tumben lu rajin sambang sini? biasanya scroll tik tok mulu. Mau cari paan?",
-  "Iya sayang ada apa?",
-  "Kan...kalo butuh aja manggil - manggil, apaan?😒",
 ];
 
 async function handleSambutan(chatId: number | string) {

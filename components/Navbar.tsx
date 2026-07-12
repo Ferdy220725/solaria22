@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -23,6 +24,7 @@ const menuItems = [
   { id: "m1", name: "Home", href: "/", icon: LayoutDashboard },
   { id: "m_absensi", name: "Absensi", href: "/absensi", icon: ClipboardCheck },
   { id: "m2", name: "Materi", href: "/materi", icon: BookOpen },
+  { id: "m_zora_ai", name: "ZORA AI", href: "/zora-ai", icon: null }, // pakai logo custom, lihat render di bawah
   { id: "m3", name: "Praktikum", href: "/praktikum", icon: FlaskConical },
   { id: "m_jadwal", name: "Jadwal", href: "/jadwal-sistem/list", icon: CalendarDays },
   { id: "m_presentasi", name: "Presentasi", href: "/presentasi", icon: MonitorPlay },
@@ -76,7 +78,23 @@ export default function Navbar() {
                   transitionDelay: open ? `${idx * 35 + 80}ms` : "0ms",
                 }}
               >
-                <Icon size={19} color={active ? "#800020" : "rgba(255,255,255,0.9)"} strokeWidth={2} />
+                {item.id === "m_zora_ai" ? (
+                  <Image
+                    src="/icons/zora-mark.png"
+                    alt="ZORA AI"
+                    width={22}
+                    height={22}
+                    className="object-contain"
+                  />
+                ) : (
+                  Icon && (
+                    <Icon
+                      size={19}
+                      color={active ? "#800020" : "rgba(255,255,255,0.9)"}
+                      strokeWidth={2}
+                    />
+                  )
+                )}
               </Link>
             );
           })}

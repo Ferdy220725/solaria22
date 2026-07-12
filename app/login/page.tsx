@@ -64,7 +64,7 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
       <form onSubmit={handleLogin} className="bg-white p-8 rounded-[30px] shadow-xl max-w-md w-full space-y-4 border border-slate-200">
-        <h2 className="text-2xl font-black text-center uppercase tracking-tighter text-[#800020]">Login ZORA</h2>
+        <h2 className="text-2xl font-black text-center uppercase tracking-tighter text-[#800020]">Login Sobat Agrotek</h2>
 
         <div>
           <label className="block text-xs font-black uppercase text-slate-500 mb-1">Nama Lengkap (Sesuai SIAKAD)</label>
@@ -96,7 +96,7 @@ export default function Login() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="username@email.com atau npm@student.upnjatim.ac.id"
+            placeholder="username@email.com"
             className="w-full p-3 rounded-xl border-2 border-slate-200 text-sm focus:border-[#800020] outline-none"
             required
           />

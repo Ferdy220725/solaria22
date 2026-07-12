@@ -12,6 +12,7 @@
     "@ai-sdk/google": "^3.0.61",
     "@ai-sdk/groq": "^3.0.35",
     "@ai-sdk/react": "^3.0.160",
+    "@google/genai": "^2.11.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/auth-ui-react": "^0.4.7",
     "@supabase/auth-ui-shared": "^0.1.8",
@@ -32,7 +33,6 @@
     "mammoth": "^1.12.0",
     "next": "^16.2.2",
     "pdf-lib": "^1.17.1",
-    "pdf-parse": "^2.4.5",
     "pdf2json": "^4.0.2",
     "pdfjs-dist": "^5.6.205",
     "qrcode": "^1.5.4",
@@ -42,10 +42,12 @@
     "react-signature-canvas": "^1.0.7",
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
+    "unpdf": "^1.6.2",
     "web-push": "^3.6.7",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.20",
     "@types/node": "^20",
     "@types/pdf-parse": "^1.1.5",
     "@types/qrcode": "^1.5.6",

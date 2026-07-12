@@ -4,16 +4,15 @@
 
 @import "tailwindcss/utilities";
 
-
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
 
 body {
-
   background-color: white;
-
   margin: 0;
-
   font-family: sans-serif;
-
 }
 
 .no-scrollbar::-webkit-scrollbar {

@@ -1,10 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 
-// Memuat environment variables dari file .env.local
 config({ path: ".env.local" });
 
-// Pastikan variabel ini ada di .env.local kamu
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -13,25 +11,49 @@ if (!supabaseUrl || !serviceRoleKey) {
   process.exit(1);
 }
 
-// Admin client menggunakan service_role key
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-// Daftar mahasiswa yang akan diundang.
-// Kalau mau pakai email custom (misal Gmail buat testing), tinggal tambahin field "email" manual.
-// Kalau field "email" tidak diisi, otomatis pakai format email kampus dari NPM.
 const students = [
-  { npm: "25025010100", nama: "AHMAT CHOYRUL FERDYANSYAH", email: "ahmatchoyrulferdyasnyah22@gmail.com" }, // contoh pakai email custom buat testing
-  // { npm: "25025010128", nama: "FARINA PUTRI AURELIA" }, // contoh tanpa email custom -> otomatis pakai email kampus
+  { npm: "25025010110", nama: "AGATHA ZULEYKA RAMDAN" , email: "" },
 ].map((s: any) => ({
   ...s,
   email: s.email || `${s.npm}@student.upnjatim.ac.id`,
 }));
+
+// ── Helper: cari user yang sudah ada berdasarkan email ────────────────────
+async function findExistingUser(email: string) {
+  // listUsers di-paginate, untuk kelas ukuran wajar ambil per 1000 cukup
+  let page = 1;
+  const perPage = 1000;
+  while (true) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+    if (error || !data?.users?.length) return null;
+    const found = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (found) return found;
+    if (data.users.length < perPage) return null; // sudah halaman terakhir
+    page++;
+  }
+}
 
 async function inviteAllStudents() {
   console.log(`🚀 Memulai proses pengiriman undangan untuk ${students.length} mahasiswa...\n`);
 
   for (const s of students) {
     try {
+      // 1. Cek apakah user dengan email ini sudah pernah dibuat sebelumnya
+      const existing = await findExistingUser(s.email);
+
+      if (existing) {
+        // Hapus dulu supaya bisa di-invite ulang dari nol (fresh, bukan resend link lama)
+        const { error: delError } = await supabaseAdmin.auth.admin.deleteUser(existing.id);
+        if (delError) {
+          console.error(`⚠️  Gagal hapus user lama ${s.email}: ${delError.message} — tetap coba invite ulang...`);
+        } else {
+          console.log(`🗑️  User lama ${s.email} dihapus, akan diundang ulang dari nol.`);
+        }
+      }
+
+      // 2. Kirim undangan baru (fresh)
       const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(s.email, {
         data: {
           nama: s.nama,
@@ -49,7 +71,6 @@ async function inviteAllStudents() {
       console.error(`❌ Terjadi error pada sistem saat mengundang ${s.email}:`, err.message);
     }
 
-    // Delay 2 detik antar kirim untuk menghindari rate-limit dari penyedia email
     await new Promise((r) => setTimeout(r, 2000));
   }
 

@@ -1,56 +1,39 @@
 "use client";
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 
 function SetPasswordForm() {
+  const [step, setStep] = useState<"verify" | "password">("verify");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [ready, setReady] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const supabase = createClient();
   const router = useRouter();
 
-  useEffect(() => {
-    // Tangkap error yang Supabase kirim langsung di hash fragment (misal otp_expired)
-    const hash = window.location.hash;
-    if (hash.includes("error=")) {
-      const params = new URLSearchParams(hash.substring(1));
-      const errorCode = params.get("error_code");
-      if (errorCode === "otp_expired") {
-        setErrorMsg("Link undangan sudah kadaluarsa atau sudah pernah dibuka. Minta admin kirim ulang undangan.");
-      } else {
-        setErrorMsg("Link tidak valid. Minta admin kirim ulang undangan.");
-      }
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setLoading(true);
+
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: otp,
+      type: "invite",
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setErrorMsg("Kode salah atau sudah kadaluarsa. Cek kembali email undangan kamu, atau minta admin kirim ulang.");
       return;
     }
 
-    // Dengarkan event auth: Supabase otomatis proses token dari hash lalu fire event ini
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
-        if (session) setReady(true);
-      }
-    });
-
-    // Fallback: cek barangkali session udah ke-set duluan sebelum listener terpasang
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
-    });
-
-    // Kasih timeout wajar - kalau setelah beberapa detik belum ada session & belum ada error,
-    // baru dianggap link invalid
-    const timeout = setTimeout(() => {
-      setReady((r) => {
-        if (!r) setErrorMsg("Link tidak valid atau sudah kadaluarsa. Minta admin kirim ulang undangan.");
-        return r;
-      });
-    }, 4000);
-
-    return () => {
-      listener.subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
-  }, []);
+    setStep("password");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,11 +54,57 @@ function SetPasswordForm() {
     }
   };
 
-  if (errorMsg) {
-    return <div className="min-h-screen flex items-center justify-center p-6 text-center">{errorMsg}</div>;
-  }
-  if (!ready) {
-    return <div className="min-h-screen flex items-center justify-center">Memuat...</div>;
+  if (step === "verify") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+        <form onSubmit={handleVerify} className="bg-white p-8 rounded-[30px] shadow-xl max-w-md w-full space-y-4 border border-slate-200">
+          <h2 className="text-2xl font-black text-center uppercase tracking-tighter text-[#800020]">
+            Verifikasi Undangan
+          </h2>
+          <p className="text-xs text-slate-500 text-center">
+            Masukkan email kampus dan kode 6 digit yang dikirim ke email kamu.
+          </p>
+
+          {errorMsg && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl text-center">
+              {errorMsg}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-black uppercase text-slate-500 mb-1">Email Kampus</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="npm@student.upnjatim.ac.id"
+              className="w-full p-3 rounded-xl border-2 border-slate-200 text-sm focus:border-[#800020] outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-black uppercase text-slate-500 mb-1">Kode Verifikasi</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+              placeholder="123456"
+              className="w-full p-3 rounded-xl border-2 border-slate-200 text-center text-2xl tracking-[0.5em] font-bold focus:border-[#800020] outline-none"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#800020] text-white py-3 rounded-xl font-black uppercase tracking-wider text-sm border-b-4 border-[#5a0016] active:scale-95 transition-all disabled:opacity-50"
+          >
+            {loading ? "Memeriksa..." : "Verifikasi"}
+          </button>
+        </form>
+      </div>
+    );
   }
 
   return (

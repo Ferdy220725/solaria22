@@ -39,6 +39,15 @@ const menuItems = [
 // floating menu ini disembunyikan di sini supaya tidak tabrakan
 const HIDDEN_ON = ["/zora-ai"];
 
+// Halaman MODE TAMPIL PRESENTASI (proyektor): /presentasi/{kode}/{itemId}
+// Sengaja pakai regex, bukan cuma prefix string, supaya BISA bedain dengan:
+//   - /presentasi              -> halaman listing, navbar tetap tampil
+//   - /presentasi/{kode}       -> halaman listing per-sesi, navbar tetap tampil
+//   - /presentasi/remote/...   -> halaman remote di HP, navbar tetap tampil
+// dan HANYA cocok untuk halaman mode tampil (2 segment setelah /presentasi/,
+// dengan segment pertama bukan "remote").
+const PRESENTASI_MODE_REGEX = /^\/presentasi\/(?!remote(\/|$))[^/]+\/[^/]+\/?$/;
+
 export default function Navbar() {
   const pathname = usePathname();
   const [shouldShow, setShouldShow] = useState(false);
@@ -49,9 +58,11 @@ export default function Navbar() {
 
   if (!shouldShow) return null;
 
-  const isHidden = HIDDEN_ON.some(
+  const isHiddenByList = HIDDEN_ON.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`)
   );
+  const isPresentasiMode = PRESENTASI_MODE_REGEX.test(pathname);
+  const isHidden = isHiddenByList || isPresentasiMode;
   if (isHidden) return null;
 
   return (

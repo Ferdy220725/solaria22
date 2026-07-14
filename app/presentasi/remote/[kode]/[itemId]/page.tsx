@@ -27,10 +27,20 @@ export default function RemoteControl({
   const [tersimpan, setTersimpan] = useState(false);
   const tersimpanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null);
+  // --- state untuk pinch-to-zoom + geser (pan) ---
+  const pinchRef = useRef<{
+    startDist: number;
+    startScale: number;
+    startMidX: number;
+    startMidY: number;
+    startPanX: number;
+    startPanY: number;
+  } | null>(null);
   const zoomScaleRef = useRef(1);
+  const panRef = useRef({ x: 0, y: 0 }); // fraksi geser, relatif ke ukuran pad
   const MIN_ZOOM = 1;
   const MAX_ZOOM = 4;
+  const MAX_PAN = 1; // batas geser biar ga terlalu jauh keluar frame
 
   useEffect(() => {
     const channel = supabase.channel(channelName(kode));
@@ -43,6 +53,21 @@ export default function RemoteControl({
           if ("slide" in ev) setSlide(ev.slide);
           if ("totalPages" in ev) setTotalPages(ev.totalPages);
           if ("blank" in ev && typeof ev.blank === "boolean") setBlank(ev.blank);
+
+          // Slide ganti -> layar utama otomatis reset zoom/pan.
+          // Samakan tampilan remote biar badge zoom ga nyangkut di angka lama.
+          if (ev.type === "slide_change") {
+            zoomScaleRef.current = 1;
+            panRef.current = { x: 0, y: 0 };
+            setZoom(1);
+          } else if (ev.type === "state_sync") {
+            const z = "zoom" in ev && typeof ev.zoom === "number" ? ev.zoom : 1;
+            const px = "panX" in ev && typeof ev.panX === "number" ? ev.panX : 0;
+            const py = "panY" in ev && typeof ev.panY === "number" ? ev.panY : 0;
+            zoomScaleRef.current = z;
+            panRef.current = { x: px, y: py };
+            setZoom(z);
+          }
         }
       })
       .subscribe((status: string) => {
@@ -112,17 +137,26 @@ export default function RemoteControl({
   const getDistance = (t1: React.Touch, t2: React.Touch) =>
     Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
 
-  const sendZoom = (scale: number) => {
+  const getMidpoint = (t1: React.Touch, t2: React.Touch) => ({
+    x: (t1.clientX + t2.clientX) / 2,
+    y: (t1.clientY + t2.clientY) / 2,
+  });
+
+  const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
+  // --- kirim gabungan zoom + pan sekaligus, biar sinkron & ga ada delay antar 2 event ---
+  const sendTransform = (scale: number, panX: number, panY: number) => {
     zoomScaleRef.current = scale;
+    panRef.current = { x: panX, y: panY };
     setZoom(scale);
     channelRef.current?.send({
       type: "broadcast",
       event: EVENT_NAME,
-      payload: { type: "zoom", scale },
+      payload: { type: "zoom", scale, panX, panY },
     });
   };
 
-  const resetZoom = () => sendZoom(1);
+  const resetZoom = () => sendTransform(1, 0, 0);
 
   const simpanCatatan = async () => {
     const isi = catatan.trim();
@@ -147,7 +181,6 @@ export default function RemoteControl({
     tersimpanTimerRef.current = setTimeout(() => setTersimpan(false), 2000);
   };
 
-  // --- tutup remote: coba tutup tab, kalau gagal (browser block), tampilkan panel penutup ---
   const handleCloseRemote = () => {
     channelRef.current?.send({
       type: "broadcast",
@@ -157,8 +190,6 @@ export default function RemoteControl({
 
     window.close();
 
-    // Kalau baris di atas tidak menutup tab (karena browser block window.close()
-    // untuk tab yang tidak dibuka lewat script), tampilkan layar penutup manual.
     setTimeout(() => setShowClosePanel(true), 150);
   };
 
@@ -188,28 +219,43 @@ export default function RemoteControl({
         )}
       </div>
 
+      {/* Area laser pointer + pinch-to-zoom + geser (pan) */}
       <div
         ref={padRef}
         className="flex-1 flex flex-col items-center justify-center gap-2 text-white/30 select-none touch-none relative"
         onTouchStart={(e) => {
           if (e.touches.length === 2) {
+            const dist = getDistance(e.touches[0], e.touches[1]);
+            const mid = getMidpoint(e.touches[0], e.touches[1]);
             pinchRef.current = {
-              startDist: getDistance(e.touches[0], e.touches[1]),
+              startDist: dist,
               startScale: zoomScaleRef.current,
+              startMidX: mid.x,
+              startMidY: mid.y,
+              startPanX: panRef.current.x,
+              startPanY: panRef.current.y,
             };
           }
         }}
         onTouchMove={(e) => {
-          if (e.touches.length === 2 && pinchRef.current) {
+          // 2 jari -> zoom (jarak antar jari) + geser (pergerakan titik tengah)
+          if (e.touches.length === 2 && pinchRef.current && padRef.current) {
+            const rect = padRef.current.getBoundingClientRect();
             const dist = getDistance(e.touches[0], e.touches[1]);
+            const mid = getMidpoint(e.touches[0], e.touches[1]);
+
             const ratio = dist / pinchRef.current.startDist;
-            const newScale = Math.min(
-              MAX_ZOOM,
-              Math.max(MIN_ZOOM, pinchRef.current.startScale * ratio)
-            );
-            sendZoom(newScale);
+            const newScale = clamp(pinchRef.current.startScale * ratio, MIN_ZOOM, MAX_ZOOM);
+
+            const deltaXFrac = (mid.x - pinchRef.current.startMidX) / rect.width;
+            const deltaYFrac = (mid.y - pinchRef.current.startMidY) / rect.height;
+            const newPanX = clamp(pinchRef.current.startPanX + deltaXFrac, -MAX_PAN, MAX_PAN);
+            const newPanY = clamp(pinchRef.current.startPanY + deltaYFrac, -MAX_PAN, MAX_PAN);
+
+            sendTransform(newScale, newPanX, newPanY);
             return;
           }
+          // 1 jari -> laser pointer (perilaku lama)
           if (e.touches.length === 1) {
             const t = e.touches[0];
             sendPointer(t.clientX, t.clientY);
@@ -227,7 +273,7 @@ export default function RemoteControl({
       >
         <Radar size={28} />
         <span className="text-center px-6">
-          Tahan &amp; geser 1 jari buat laser pointer, cubit 2 jari buat zoom
+          Tahan &amp; geser 1 jari buat laser pointer, cubit &amp; geser 2 jari buat zoom
         </span>
 
         {zoom > 1 && (
@@ -329,7 +375,6 @@ export default function RemoteControl({
         </div>
       )}
 
-      {/* Panel penutup — muncul kalau window.close() diblokir browser */}
       {showClosePanel && (
         <div className="fixed inset-0 z-[999] bg-[#111] flex flex-col items-center justify-center gap-4 p-6 text-center">
           <Power size={40} className="text-white/40" />

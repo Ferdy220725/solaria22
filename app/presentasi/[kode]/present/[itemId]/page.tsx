@@ -122,7 +122,10 @@ export default function ModePresentasi({
       const fs = !!document.fullscreenElement;
       setIsFullscreen(fs);
       if (fs) {
-        showControlsTemporarily();
+        // Langsung sembunyikan navbar begitu masuk fullscreen, tanpa nongol dulu.
+        // Baru muncul lagi kalau ada gerakan/klik (lihat handleActivity di bawah).
+        setControlsVisible(false);
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
       } else {
         setControlsVisible(true);
         if (hideTimerRef.current) clearTimeout(hideTimerRef.current);

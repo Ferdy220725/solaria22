@@ -28,6 +28,7 @@ export default function ModePresentasi({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [blank, setBlank] = useState(false);
+  const [zoom, setZoom] = useState(1); // skala zoom slide, dikontrol dari remote
 
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<any>(null);
@@ -36,6 +37,7 @@ export default function ModePresentasi({
   const slideRef = useRef(slide);
   const totalPagesRef = useRef(totalPages);
   const blankRef = useRef(blank);
+  const zoomRef = useRef(zoom);
 
   useEffect(() => {
     slideRef.current = slide;
@@ -48,6 +50,10 @@ export default function ModePresentasi({
   useEffect(() => {
     blankRef.current = blank;
   }, [blank]);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
 
   const goToSlide = useCallback(
     async (n: number, broadcast = true) => {
@@ -69,6 +75,9 @@ export default function ModePresentasi({
           payload: { type: "slide_change", slide: clamped },
         });
       }
+
+      // Reset zoom tiap pindah slide, biar ga kebawa zoom ke slide berikutnya
+      setZoom(1);
     },
     [kode]
   );
@@ -174,6 +183,7 @@ export default function ModePresentasi({
               slide: slideRef.current,
               totalPages: totalPagesRef.current,
               blank: blankRef.current,
+              zoom: zoomRef.current,
             },
           });
         } else if (ev.type === "nav") {
@@ -186,6 +196,8 @@ export default function ModePresentasi({
           setPointer(null);
         } else if (ev.type === "blank") {
           setBlank(ev.on);
+        } else if (ev.type === "zoom") {
+          setZoom(ev.scale);
         }
       })
       .subscribe();
@@ -240,7 +252,15 @@ export default function ModePresentasi({
 
       {/* Area slide — SELALU full height & width, tidak dipengaruhi bar atas */}
       <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-        <canvas ref={canvasRef} className="max-h-full max-w-full shadow-2xl" />
+        <canvas
+          ref={canvasRef}
+          className="max-h-full max-w-full shadow-2xl"
+          style={{
+            transform: `scale(${zoom})`,
+            transformOrigin: "center center",
+            transition: "transform 0.15s ease-out",
+          }}
+        />
 
         {pointer && (
           <div

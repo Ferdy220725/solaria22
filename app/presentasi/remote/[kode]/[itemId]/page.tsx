@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, use } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { channelName, EVENT_NAME, PresentasiEvent } from "@/lib/presentasiChannel";
-import { ChevronLeft, ChevronRight, Radar, NotebookPen, Check, LayoutGrid, MonitorOff, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Radar, NotebookPen, Check, LayoutGrid, MonitorOff, X, ZoomIn, Power } from "lucide-react";
 
 export default function RemoteControl({
   params,
@@ -17,14 +17,20 @@ export default function RemoteControl({
   const [totalPages, setTotalPages] = useState<number | null>(null);
   const [blank, setBlank] = useState(false);
   const [showSlideList, setShowSlideList] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [showClosePanel, setShowClosePanel] = useState(false);
   const padRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
 
-  // --- state untuk catatan presentator ---
   const [catatan, setCatatan] = useState("");
   const [menyimpan, setMenyimpan] = useState(false);
   const [tersimpan, setTersimpan] = useState(false);
   const tersimpanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null);
+  const zoomScaleRef = useRef(1);
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 4;
 
   useEffect(() => {
     const channel = supabase.channel(channelName(kode));
@@ -103,7 +109,21 @@ export default function RemoteControl({
     });
   };
 
-  // --- simpan catatan ke Supabase, tidak pernah dibroadcast ke channel ---
+  const getDistance = (t1: React.Touch, t2: React.Touch) =>
+    Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+
+  const sendZoom = (scale: number) => {
+    zoomScaleRef.current = scale;
+    setZoom(scale);
+    channelRef.current?.send({
+      type: "broadcast",
+      event: EVENT_NAME,
+      payload: { type: "zoom", scale },
+    });
+  };
+
+  const resetZoom = () => sendZoom(1);
+
   const simpanCatatan = async () => {
     const isi = catatan.trim();
     if (!isi || menyimpan) return;
@@ -127,9 +147,32 @@ export default function RemoteControl({
     tersimpanTimerRef.current = setTimeout(() => setTersimpan(false), 2000);
   };
 
+  // --- tutup remote: coba tutup tab, kalau gagal (browser block), tampilkan panel penutup ---
+  const handleCloseRemote = () => {
+    channelRef.current?.send({
+      type: "broadcast",
+      event: EVENT_NAME,
+      payload: { type: "leave" },
+    });
+
+    window.close();
+
+    // Kalau baris di atas tidak menutup tab (karena browser block window.close()
+    // untuk tab yang tidak dibuka lewat script), tampilkan layar penutup manual.
+    setTimeout(() => setShowClosePanel(true), 150);
+  };
+
   return (
     <div className="fixed inset-0 bg-[#111] text-white flex flex-col">
       <div className="p-4 text-center border-b border-white/10 relative">
+        <button
+          onClick={handleCloseRemote}
+          aria-label="Tutup remote"
+          className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-white/10 px-3 py-2 rounded-xl text-xs font-bold"
+        >
+          <Power size={14} />
+        </button>
+
         <p className="text-white/50 text-sm">Remote presentasi</p>
         <p className="font-bold text-lg">
           {slide ?? "-"} / {totalPages ?? "-"}
@@ -145,15 +188,37 @@ export default function RemoteControl({
         )}
       </div>
 
-      {/* Area laser pointer */}
       <div
         ref={padRef}
-        className="flex-1 flex items-center justify-center gap-2 text-white/30 select-none touch-none"
-        onTouchMove={(e) => {
-          const t = e.touches[0];
-          sendPointer(t.clientX, t.clientY);
+        className="flex-1 flex flex-col items-center justify-center gap-2 text-white/30 select-none touch-none relative"
+        onTouchStart={(e) => {
+          if (e.touches.length === 2) {
+            pinchRef.current = {
+              startDist: getDistance(e.touches[0], e.touches[1]),
+              startScale: zoomScaleRef.current,
+            };
+          }
         }}
-        onTouchEnd={hidePointer}
+        onTouchMove={(e) => {
+          if (e.touches.length === 2 && pinchRef.current) {
+            const dist = getDistance(e.touches[0], e.touches[1]);
+            const ratio = dist / pinchRef.current.startDist;
+            const newScale = Math.min(
+              MAX_ZOOM,
+              Math.max(MIN_ZOOM, pinchRef.current.startScale * ratio)
+            );
+            sendZoom(newScale);
+            return;
+          }
+          if (e.touches.length === 1) {
+            const t = e.touches[0];
+            sendPointer(t.clientX, t.clientY);
+          }
+        }}
+        onTouchEnd={(e) => {
+          if (e.touches.length < 2) pinchRef.current = null;
+          if (e.touches.length === 0) hidePointer();
+        }}
         onMouseMove={(e) => {
           if (e.buttons === 1) sendPointer(e.clientX, e.clientY);
         }}
@@ -161,10 +226,21 @@ export default function RemoteControl({
         onMouseLeave={hidePointer}
       >
         <Radar size={28} />
-        <span>Tahan &amp; geser di sini buat laser pointer</span>
+        <span className="text-center px-6">
+          Tahan &amp; geser 1 jari buat laser pointer, cubit 2 jari buat zoom
+        </span>
+
+        {zoom > 1 && (
+          <button
+            onClick={resetZoom}
+            className="mt-2 flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-full text-xs font-bold text-white"
+          >
+            <ZoomIn size={14} />
+            {Math.round(zoom * 100)}% • Reset
+          </button>
+        )}
       </div>
 
-      {/* Panel catatan presentator — hanya ada di remote, tidak pernah tampil di layar proyeksi */}
       <div className="px-4 pb-2">
         <label className="flex items-center gap-2 text-white/50 text-xs mb-1">
           <NotebookPen size={14} />
@@ -188,7 +264,6 @@ export default function RemoteControl({
         </div>
       </div>
 
-      {/* Tombol Blank Screen */}
       <div className="px-4 pb-2">
         <button
           onClick={toggleBlank}
@@ -216,7 +291,6 @@ export default function RemoteControl({
         </button>
       </div>
 
-      {/* Bottom sheet: Daftar Slide (Mini Navigator) — klik langsung lompat */}
       {showSlideList && totalPages && (
         <div
           className="fixed inset-0 z-50 bg-black/70 flex items-end"
@@ -252,6 +326,16 @@ export default function RemoteControl({
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Panel penutup — muncul kalau window.close() diblokir browser */}
+      {showClosePanel && (
+        <div className="fixed inset-0 z-[999] bg-[#111] flex flex-col items-center justify-center gap-4 p-6 text-center">
+          <Power size={40} className="text-white/40" />
+          <p className="text-white/70 text-sm max-w-xs">
+            Remote sudah ditutup. Silakan tutup tab ini secara manual untuk kembali ke layar HP kamu.
+          </p>
         </div>
       )}
     </div>

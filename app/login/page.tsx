@@ -21,7 +21,7 @@ export default function Login() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        router.replace('/');
+        router.replace('/dashboard');
       } else {
         setCheckingSession(false);
       }
@@ -49,7 +49,7 @@ export default function Login() {
     } else {
       localStorage.setItem('nama_user_solaria', namaLengkap.trim());
       localStorage.setItem('npm_user_solaria', npm.trim());
-      router.push('/');
+      router.push('/dashboard');
     }
   };
 

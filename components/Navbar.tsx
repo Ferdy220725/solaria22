@@ -21,7 +21,7 @@ import {
 import { useEffect, useState } from "react";
 
 const menuItems = [
-  { id: "m1", name: "Home", href: "/", icon: LayoutDashboard },
+  { id: "m1", name: "Home", href: "/dashboard", icon: LayoutDashboard },
   { id: "m_absensi", name: "Absensi", href: "/absensi", icon: ClipboardCheck },
   { id: "m2", name: "Materi", href: "/materi", icon: BookOpen },
   { id: "m_zora_ai", name: "ZORA AI", href: "/zora-ai", icon: null },

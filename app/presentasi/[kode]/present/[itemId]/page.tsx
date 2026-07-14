@@ -29,6 +29,8 @@ export default function ModePresentasi({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [blank, setBlank] = useState(false);
   const [zoom, setZoom] = useState(1); // skala zoom slide, dikontrol dari remote
+  const [panX, setPanX] = useState(0); // geser horizontal (fraksi -1..1), dikontrol dari remote
+  const [panY, setPanY] = useState(0); // geser vertikal (fraksi -1..1), dikontrol dari remote
 
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<any>(null);
@@ -38,6 +40,8 @@ export default function ModePresentasi({
   const totalPagesRef = useRef(totalPages);
   const blankRef = useRef(blank);
   const zoomRef = useRef(zoom);
+  const panXRef = useRef(panX);
+  const panYRef = useRef(panY);
 
   useEffect(() => {
     slideRef.current = slide;
@@ -54,6 +58,14 @@ export default function ModePresentasi({
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
+
+  useEffect(() => {
+    panXRef.current = panX;
+  }, [panX]);
+
+  useEffect(() => {
+    panYRef.current = panY;
+  }, [panY]);
 
   const goToSlide = useCallback(
     async (n: number, broadcast = true) => {
@@ -76,8 +88,10 @@ export default function ModePresentasi({
         });
       }
 
-      // Reset zoom tiap pindah slide, biar ga kebawa zoom ke slide berikutnya
+      // Reset zoom & pan tiap pindah slide, biar ga kebawa zoom ke slide berikutnya
       setZoom(1);
+      setPanX(0);
+      setPanY(0);
     },
     [kode]
   );
@@ -184,6 +198,8 @@ export default function ModePresentasi({
               totalPages: totalPagesRef.current,
               blank: blankRef.current,
               zoom: zoomRef.current,
+              panX: panXRef.current,
+              panY: panYRef.current,
             },
           });
         } else if (ev.type === "nav") {
@@ -198,6 +214,8 @@ export default function ModePresentasi({
           setBlank(ev.on);
         } else if (ev.type === "zoom") {
           setZoom(ev.scale);
+          if (typeof ev.panX === "number") setPanX(ev.panX);
+          if (typeof ev.panY === "number") setPanY(ev.panY);
         }
       })
       .subscribe();
@@ -256,9 +274,9 @@ export default function ModePresentasi({
           ref={canvasRef}
           className="max-h-full max-w-full shadow-2xl"
           style={{
-            transform: `scale(${zoom})`,
+            transform: `scale(${zoom}) translate(${panX * 100}%, ${panY * 100}%)`,
             transformOrigin: "center center",
-            transition: "transform 0.15s ease-out",
+            transition: "transform 0.1s ease-out",
           }}
         />
 

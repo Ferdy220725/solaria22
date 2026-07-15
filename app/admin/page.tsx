@@ -355,20 +355,21 @@ export default function SuperAdminPage() {
     doc.save(`Izin_${data.npm}.pdf`);
   };
 
-  const toggleAbsensi = async (status: boolean) => {
-    const { error } = await supabase.from('status_sistem').update({ is_active: status }).eq('id', 'absensi');
-    if (!error) {
-      setAbsensiEnabled(status);
+ const toggleAbsensi = async (status: boolean) => {
+  const { error } = await supabase.from('status_sistem').update({ is_active: status }).eq('id', 'absensi');
+  if (!error) {
+    setAbsensiEnabled(status);
 
-      // Notifikasi Telegram: status absensi diubah
-      sendTelegramNotification(
-        `🚪 <b>STATUS ABSENSI DIUBAH</b>\n` +
-        `Status: <b>${status ? 'DIBUKA ✅' : 'DITUTUP ❌'}</b>`
-      );
+    // Notifikasi Telegram: status absensi diubah (sertakan kode akses kalau dibuka)
+    sendTelegramNotification(
+      `🚪 <b>STATUS ABSENSI DIUBAH</b>\n` +
+      `Status: <b>${status ? 'DIBUKA ✅' : 'DITUTUP ❌'}</b>` +
+      (status ? `\n🔑 Kode Akses: <code>${kodeAbsen.toUpperCase() || "-"}</code>` : '')
+    );
 
-      fetchData();
-    }
-  };
+    fetchData();
+  }
+};
 
   const updateKodeAbsen = async () => {
     const { error } = await supabase.from('status_sistem').update({ kode_akses: kodeAbsen.toUpperCase() }).eq('id', 'absensi');

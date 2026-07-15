@@ -10,19 +10,29 @@ const supabase = createClient(
 
 // ── Helper: kirim balik pesan ke Telegram ─────────────────────────────────
 async function replyTelegram(chatId: number | string, text: string) {
-  await fetch(
-    `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        }),
+      }
+    );
+    const data = await res.json();
+    if (!data.ok) {
+      console.error("[Telegram] Gagal kirim pesan:", data);
     }
-  );
+    return data;
+  } catch (err) {
+    console.error("[Telegram] Fetch error saat replyTelegram:", err);
+    return null;
+  }
 }
 
 // ── Helper: kirim pesan panjang (split biar nggak kena limit 4096 char) ───
@@ -42,7 +52,9 @@ function formatWIB(dateString: string) {
       dateStyle: "medium",
       timeStyle: "short",
     });
-  } catch { return dateString; }
+  } catch {
+    return dateString;
+  }
 }
 
 // ── Helper: cek & tambah kuota AI harian (default limit 100x/hari) ────────
@@ -100,8 +112,6 @@ async function callGeminiWithRetry(systemPrompt: string, userPrompt: string, ret
 }
 
 // ── Daftar alias command tanpa "/" ─────────────────────────────────────────
-// Grup ini khusus buat ngobrol sama bot, jadi matching-nya dibikin longgar
-// (dicari di mana pun dalam kalimat, bukan cuma di awal pesan)
 const commandAliases: Record<string, string[]> = {
   "/help": ["bantuan", "menu", "perintah apa aja", "bisa apa"],
   "/jadwal": ["jadwal zoom", "jadwal kelas", "jadwal"],
@@ -112,7 +122,6 @@ const commandAliases: Record<string, string[]> = {
   "/listdosen": ["daftar dosen", "list dosen", "semua dosen"],
   "/dosen": ["kontak dosen", "cari dosen", "dosen"],
   "/materi": ["cari materi", "materi"],
-  // alias paling pendek/umum diletakkan terakhir biar prioritasnya paling rendah
   "/start": ["halo", "hai", "hei zora", "woy zora", "zora"],
 };
 
@@ -120,7 +129,6 @@ const commandAliases: Record<string, string[]> = {
 function resolveCommand(rawText: string): { command: string; args: string } {
   const trimmed = rawText.trim();
 
-  // 1. Kalau diawali "/", tetap pakai parsing lama (paling presisi, tetap didukung)
   if (trimmed.startsWith("/")) {
     const parts = trimmed.split(" ");
     return {
@@ -129,7 +137,6 @@ function resolveCommand(rawText: string): { command: string; args: string } {
     };
   }
 
-  // 2. Tanpa "/" → cari alias di mana pun dalam kalimat
   const lower = trimmed.toLowerCase();
   const allMatches: { command: string; alias: string }[] = [];
 
@@ -143,8 +150,6 @@ function resolveCommand(rawText: string): { command: string; args: string } {
 
   if (allMatches.length === 0) return { command: "", args: "" };
 
-  // alias terpanjang menang, biar "tugas kuliah" nggak kepotong jadi "tugas" doang
-  // dan "jadwal" nggak kalah sama "zora" kalau dua-duanya kesebut
   allMatches.sort((a, b) => b.alias.length - a.alias.length);
   const best = allMatches[0];
 
@@ -175,20 +180,33 @@ async function handleSambutan(chatId: number | string) {
 async function handleCronHarian() {
   try {
     console.log("[Cron] Memulai eksekusi tugas harian gabungan...");
-    const TARGET_CHAT_ID = process.env.TELEGRAM_CLASS_CHAT_ID || "";
+
+    // FIX: fallback ke TELEGRAM_CHAT_ID kalau TELEGRAM_CLASS_CHAT_ID belum di-set,
+    // karena sebelumnya env var ini nggak ada di Vercel sehingga cron selalu
+    // berhenti di sini tanpa mengirim apapun ke grup.
+    const TARGET_CHAT_ID =
+      process.env.TELEGRAM_CLASS_CHAT_ID || process.env.TELEGRAM_CHAT_ID || "";
+
     if (!TARGET_CHAT_ID) {
-      console.log("[Cron] Error: TELEGRAM_CLASS_CHAT_ID belum dikonfigurasi.");
+      console.error(
+        "[Cron] Error: TELEGRAM_CLASS_CHAT_ID / TELEGRAM_CHAT_ID belum dikonfigurasi di environment."
+      );
       return;
     }
 
     const now = new Date();
 
-    const { data: tugasKuliah } = await supabase
+    // ── Reminder tugas kuliah ──────────────────────────────────────────
+    const { data: tugasKuliah, error: tugasErr } = await supabase
       .from("tugas_perkuliahan")
       .select("*")
       .gte("deadline", now.toISOString())
       .order("deadline", { ascending: true })
       .limit(5);
+
+    if (tugasErr) {
+      console.error("[Cron] Gagal ambil data tugas_perkuliahan:", tugasErr);
+    }
 
     if (tugasKuliah && tugasKuliah.length > 0) {
       let teksReminder = `⏰ <b>PENGINGAT TUGAS KULIAH HARI INI</b> ⏰\n\n`;
@@ -198,12 +216,17 @@ async function handleCronHarian() {
       await replyTelegram(TARGET_CHAT_ID, teksReminder);
     }
 
+    // ── Info Siamik terbaru ─────────────────────────────────────────────
     const { data: infoSiamik, error: siamikErr } = await supabase
       .from("siamik_news")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (siamikErr) {
+      console.error("[Cron] Gagal ambil data siamik_news:", siamikErr);
+    }
 
     if (!siamikErr && infoSiamik && !infoSiamik.sudah_dikirim) {
       const pesanSiamik =
@@ -215,12 +238,21 @@ async function handleCronHarian() {
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `👉 <i>Silakan cek akun Siamik masing-masing untuk info lebih lanjut!</i>`;
 
-      await replyTelegram(TARGET_CHAT_ID, pesanSiamik);
+      const hasil = await replyTelegram(TARGET_CHAT_ID, pesanSiamik);
 
-      await supabase
-        .from("siamik_news")
-        .update({ sudah_dikirim: true })
-        .eq("id", infoSiamik.id);
+      // Hanya tandai "sudah_dikirim" kalau pengiriman ke Telegram benar-benar sukses,
+      // supaya kalau gagal kirim, info yang sama masih dicoba lagi di run cron berikutnya
+      // alih-alih ke-skip selamanya.
+      if (hasil?.ok) {
+        await supabase
+          .from("siamik_news")
+          .update({ sudah_dikirim: true })
+          .eq("id", infoSiamik.id);
+      } else {
+        console.error(
+          "[Cron] Gagal kirim info Siamik ke Telegram, sudah_dikirim TIDAK di-update."
+        );
+      }
     }
 
     console.log("[Cron] Semua tugas harian selesai diproses.");
@@ -356,7 +388,10 @@ async function handleMateri(chatId: number | string, keyword: string) {
   }
 
   const { data, error } = await query;
-  if (error) { await replyTelegram(chatId, "❌ Gagal mengambil materi."); return; }
+  if (error) {
+    await replyTelegram(chatId, "❌ Gagal mengambil materi.");
+    return;
+  }
   if (!data || data.length === 0) {
     await replyTelegram(chatId, keyword ? `📭 Materi "<b>${keyword}</b>" tidak ditemukan.` : "📭 Belum ada materi.");
     return;
@@ -382,11 +417,20 @@ async function handleRingkas(chatId: number | string, keyword: string) {
     .limit(1)
     .maybeSingle();
 
-  if (!materi) { await replyTelegram(chatId, `📭 Materi "<b>${keyword}</b>" tidak ditemukan.`); return; }
-  if (!materi.konten_teks) { await replyTelegram(chatId, `⚠️ Materi ini belum punya teks untuk diringkas. Hubungi admin.`); return; }
+  if (!materi) {
+    await replyTelegram(chatId, `📭 Materi "<b>${keyword}</b>" tidak ditemukan.`);
+    return;
+  }
+  if (!materi.konten_teks) {
+    await replyTelegram(chatId, `⚠️ Materi ini belum punya teks untuk diringkas. Hubungi admin.`);
+    return;
+  }
 
   const allowed = await checkAndIncrementQuota(100);
-  if (!allowed) { await replyTelegram(chatId, "🚫 Kuota AI harian bot sudah habis. Coba lagi besok."); return; }
+  if (!allowed) {
+    await replyTelegram(chatId, "🚫 Kuota AI harian bot sudah habis. Coba lagi besok.");
+    return;
+  }
 
   await replyTelegram(chatId, "⏳ Sedang meringkas materi, tunggu sebentar...");
 
@@ -411,11 +455,20 @@ async function handleSoal(chatId: number | string, keyword: string) {
     .limit(1)
     .maybeSingle();
 
-  if (!materi) { await replyTelegram(chatId, `📭 Materi "<b>${keyword}</b>" tidak ditemukan.`); return; }
-  if (!materi.konten_teks) { await replyTelegram(chatId, `⚠️ Materi ini belum punya teks untuk dibuatkan soal. Hubungi admin.`); return; }
+  if (!materi) {
+    await replyTelegram(chatId, `📭 Materi "<b>${keyword}</b>" tidak ditemukan.`);
+    return;
+  }
+  if (!materi.konten_teks) {
+    await replyTelegram(chatId, `⚠️ Materi ini belum punya teks untuk dibuatkan soal. Hubungi admin.`);
+    return;
+  }
 
   const allowed = await checkAndIncrementQuota(100);
-  if (!allowed) { await replyTelegram(chatId, "🚫 Kuota AI harian bot sudah habis. Coba lagi besok."); return; }
+  if (!allowed) {
+    await replyTelegram(chatId, "🚫 Kuota AI harian bot sudah habis. Coba lagi besok.");
+    return;
+  }
 
   await replyTelegram(chatId, "⏳ Sedang membuat soal latihan, tunggu sebentar...");
 

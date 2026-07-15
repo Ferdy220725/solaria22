@@ -2,12 +2,23 @@
 
 import React, { useState, useRef } from "react";
 import SignatureCanvas from "react-signature-canvas";
+import { jsPDF } from "jspdf";
 import { createClient } from "@/utils/supabase/client"; // Pastikan path ini sesuai dengan project Next.js kamu
+
+// ── Kontak tujuan (ubah di sini kalau nomor/link grup berubah) ────────────
+const NOMOR_WA_ADMIN = "6282228731431"; // 0822... diubah ke format internasional 62
+const LINK_GRUP_WA = "https://chat.whatsapp.com/HsCgjIZE6pABuh5U2dABoj?s=cl&p=a&ilr=0&amv=3";
 
 const SuratIzinMahasiswa = () => {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+
+  // State buat tahap "setelah submit": nyimpen PDF yang sudah jadi + status kirim
+  const [suratPdfFile, setSuratPdfFile] = useState<File | null>(null);
+  const [suratPdfUrl, setSuratPdfUrl] = useState<string | null>(null);
+  const [showKirimPanel, setShowKirimPanel] = useState(false);
+  const [namaFilePdf, setNamaFilePdf] = useState("");
 
   const [formData, setFormData] = useState({
     namaMatkul: "",
@@ -34,6 +45,122 @@ const SuratIzinMahasiswa = () => {
     else sigPadOrtu.current?.clear();
   };
 
+  // ── Generate PDF surat izin (dipakai langsung dari data form + TTD yang baru diisi) ──
+  const buildSuratPdf = (
+    data: typeof formData,
+    ttdMhsBase64: string,
+    ttdOrtuBase64: string,
+    lampiranUrl: string
+  ): jsPDF => {
+    const doc = new jsPDF();
+    doc.setFont("times", "bold");
+    doc.setFontSize(14);
+    doc.text("SURAT PERMOHONAN IZIN KULIAH", 105, 25, { align: "center" });
+    doc.setFont("times", "normal");
+    doc.setFontSize(12);
+    doc.text("Kepada Yth.", 20, 45);
+    doc.setFont("times", "bold");
+    doc.text("Bapak/Ibu Dosen Pengampu Mata Kuliah", 20, 51);
+    doc.text(data.namaMatkul || "-", 20, 57);
+    doc.text("Di Tempat", 20, 63);
+    doc.setFont("times", "normal");
+    doc.text("Dengan hormat,", 20, 75);
+    doc.text("Saya yang bertanda tangan di bawah ini:", 20, 82);
+    const dX = 30;
+    doc.text(`Nama Mahasiswa`, dX, 92);
+    doc.text(`: ${data.namaLengkap}`, dX + 40, 92);
+    doc.text(`NPM`, dX, 99);
+    doc.text(`: ${data.npm}`, dX + 40, 99);
+    doc.text(`Program Studi`, dX, 106);
+    doc.text(`: ${data.prodi || "Agroteknologi"}`, dX + 40, 106);
+    const isi = `Melalui surat ini, saya bermaksud untuk mengajukan permohonan izin tidak mengikuti kegiatan perkuliahan pada tanggal ${data.tanggal || "-"}, dikarenakan ${data.alasan || "-"}.`;
+    doc.text(doc.splitTextToSize(isi, 170), 20, 120);
+    doc.text("Demikian surat permohonan ini saya sampaikan. Atas perhatiannya saya ucapkan terima kasih.", 20, 140);
+    const ttdY = 165;
+    doc.text("Mengetahui,", 50, ttdY, { align: "center" });
+    doc.text("Wali Mahasiswa,", 50, ttdY + 6, { align: "center" });
+    doc.text("Hormat saya,", 150, ttdY, { align: "center" });
+    doc.text("Mahasiswa,", 150, ttdY + 6, { align: "center" });
+    try {
+      doc.addImage(ttdOrtuBase64, "PNG", 30, ttdY + 10, 40, 15);
+    } catch (e) {}
+    try {
+      doc.addImage(ttdMhsBase64, "PNG", 130, ttdY + 10, 40, 15);
+    } catch (e) {}
+    doc.setFont("times", "bold");
+    doc.text(`( ${data.namaWali || "________________"} )`, 50, ttdY + 35, { align: "center" });
+    doc.text(`( ${data.namaLengkap} )`, 150, ttdY + 35, { align: "center" });
+    if (lampiranUrl) {
+      doc.addPage();
+      doc.text("LAMPIRAN BUKTI", 105, 20, { align: "center" });
+      try {
+        doc.addImage(lampiranUrl, "JPEG", 15, 30, 180, 240);
+      } catch (e) {}
+    }
+    return doc;
+  };
+
+  // ── Coba kirim file PDF langsung lewat Web Share API (share sheet native HP) ──
+  // User tetap yang milih WhatsApp + kontak/grup tujuan di share sheet-nya,
+  // tapi file-nya udah otomatis nempel, jadi cukup 1-2 tap doang.
+  const shareViaWebShare = async (pdfFile: File): Promise<boolean> => {
+    const nav = navigator as any;
+    if (!nav.share || !nav.canShare || !nav.canShare({ files: [pdfFile] })) {
+      return false;
+    }
+    try {
+      await nav.share({
+        files: [pdfFile],
+        title: "Surat Izin Kuliah",
+        text: `Surat izin kuliah atas nama ${formData.namaLengkap} (${formData.npm})`,
+      });
+      return true;
+    } catch (err) {
+      // User cancel share sheet, atau error lain — anggap gagal, biar fallback jalan
+      console.warn("Web Share dibatalkan/gagal:", err);
+      return false;
+    }
+  };
+
+  // ── Fallback: download PDF + buka WA dengan pesan siap pakai ──────────────
+  const openWaPersonal = () => {
+    const pesan = encodeURIComponent(
+      `Halo, saya ${formData.namaLengkap} (NPM: ${formData.npm}) ingin mengirimkan surat izin kuliah. Mohon tunggu, file PDF nya sudah otomatis terdownload, saya lampirkan di sini ya 🙏`
+    );
+    window.open(`https://wa.me/${NOMOR_WA_ADMIN}?text=${pesan}`, "_blank");
+  };
+
+  const openWaGrup = () => {
+    window.open(LINK_GRUP_WA, "_blank");
+  };
+
+  const downloadPdfManual = () => {
+    if (!suratPdfUrl) return;
+    const a = document.createElement("a");
+    a.href = suratPdfUrl;
+    a.download = namaFilePdf;
+    a.click();
+  };
+
+  const handleKirimWaPersonal = async () => {
+    if (!suratPdfFile) return;
+    const berhasil = await shareViaWebShare(suratPdfFile);
+    if (!berhasil) {
+      // Fallback: download dulu, baru buka chat WA-nya
+      downloadPdfManual();
+      openWaPersonal();
+    }
+  };
+
+  const handleKirimWaGrup = async () => {
+    if (!suratPdfFile) return;
+    const berhasil = await shareViaWebShare(suratPdfFile);
+    if (!berhasil) {
+      downloadPdfManual();
+      openWaGrup();
+    }
+  };
+
   const handleSubmit = async () => {
     // Validasi Sederhana
     if (!formData.namaLengkap || !formData.npm || !formData.namaMatkul) {
@@ -54,44 +181,54 @@ const SuratIzinMahasiswa = () => {
 
       // 2. Upload Lampiran ke Supabase Storage (jika ada)
       if (file) {
-        const fileExt = file.name.split('.').pop();
+        const fileExt = file.name.split(".").pop();
         const fileName = `${Date.now()}_bukti.${fileExt}`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('uploads') // Pastikan nama bucket di Supabase adalah 'uploads'
+
+        const { error: uploadError } = await supabase.storage
+          .from("uploads") // Pastikan nama bucket di Supabase adalah 'uploads'
           .upload(fileName, file);
 
         if (uploadError) throw uploadError;
 
-        const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(fileName);
+        const { data: urlData } = supabase.storage.from("uploads").getPublicUrl(fileName);
         lampiranUrl = urlData.publicUrl;
       }
 
       // 3. Insert ke Tabel perizinan (Menyesuaikan kolom tabelmu)
-      const { error } = await supabase.from('perizinan').insert([{
-        nama_lengkap: formData.namaLengkap,
-        npm: formData.npm,
-        mk_nama: formData.namaMatkul,
-        alasan: formData.alasan,
-        nama_wali: formData.namaWali,
-        prodi: formData.prodi,
-        fakultas: formData.fakultas,
-        tgl_izin: formData.tanggal,
-        tanda_tangan_url: ttdMhsBase64,   // TTD Mahasiswa disimpan di sini
-        surat_dokter_url: ttdOrtuBase64,   // TTD Wali disimpan di sini
-        file_pdf_url: lampiranUrl        // URL Lampiran foto/bukti
-      }]);
+      const { error } = await supabase.from("perizinan").insert([
+        {
+          nama_lengkap: formData.namaLengkap,
+          npm: formData.npm,
+          mk_nama: formData.namaMatkul,
+          alasan: formData.alasan,
+          nama_wali: formData.namaWali,
+          prodi: formData.prodi,
+          fakultas: formData.fakultas,
+          tgl_izin: formData.tanggal,
+          tanda_tangan_url: ttdMhsBase64, // TTD Mahasiswa disimpan di sini
+          surat_dokter_url: ttdOrtuBase64, // TTD Wali disimpan di sini
+          file_pdf_url: lampiranUrl, // URL Lampiran foto/bukti
+        },
+      ]);
 
       if (error) throw error;
 
-      alert("Berhasil! Data perizinan telah dikirim ke Admin.");
-      
-      // Reset form
+      // 4. Generate PDF surat izin dari data yang baru saja dikirim
+      const doc = buildSuratPdf(formData, ttdMhsBase64, ttdOrtuBase64, lampiranUrl);
+      const pdfBlob = doc.output("blob");
+      const fileName = `Izin_${formData.npm || "mahasiswa"}.pdf`;
+      const pdfFileObj = new File([pdfBlob], fileName, { type: "application/pdf" });
+
+      setSuratPdfFile(pdfFileObj);
+      setSuratPdfUrl(URL.createObjectURL(pdfBlob));
+      setNamaFilePdf(fileName);
+      setShowKirimPanel(true);
+
+      // Reset form (surat & TTD tetap disimpan di state buat panel kirim)
       setFormData({ ...formData, namaMatkul: "", alasan: "", tanggal: "" });
       setFile(null);
       sigPadMhs.current?.clear();
       sigPadOrtu.current?.clear();
-
     } catch (err: any) {
       console.error(err);
       alert("Gagal mengirim data: " + err.message);
@@ -100,10 +237,74 @@ const SuratIzinMahasiswa = () => {
     }
   };
 
+  // Tandai kalau user sudah menekan salah satu opsi kirim/download,
+  // supaya modal tidak lagi "memaksa" setelah aksi dilakukan.
+  const [sudahPilihAksi, setSudahPilihAksi] = useState(false);
+
+  const handlePilihAksi = async (aksi: "wa" | "grup" | "download") => {
+    if (aksi === "wa") await handleKirimWaPersonal();
+    else if (aksi === "grup") await handleKirimWaGrup();
+    else downloadPdfManual();
+    setSudahPilihAksi(true);
+  };
+
   return (
     <div className="p-4 md:p-10 bg-slate-100 min-h-screen text-slate-900 font-sans">
+      {/* ── MODAL WAJIB: muncul begitu perizinan sukses terkirim ── */}
+      {showKirimPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-white max-w-md w-full rounded-[30px] p-6 md:p-8 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in duration-200">
+            <div className="w-14 h-14 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto text-2xl font-black">
+              ✓
+            </div>
+            <div>
+              <p className="text-sm font-black text-slate-800 uppercase">Data Berhasil Terkirim!</p>
+              <p className="text-xs font-black text-[#800020] uppercase mt-1">Satu Langkah Lagi ⚠️</p>
+            </div>
+            <p className="text-[12px] text-slate-500 leading-relaxed">
+              Surat PDF kamu sudah siap. <b>Wajib dikirim ke Admin lewat WhatsApp</b> di bawah ini supaya
+              perizinanmu langsung diproses — laporan tidak dianggap masuk kalau surat belum dikirim.
+            </p>
+
+            <div className="flex flex-col gap-3 pt-2">
+              <button
+                onClick={() => handlePilihAksi("wa")}
+                className="w-full bg-green-600 text-white px-5 py-4 rounded-xl font-black text-xs shadow-md hover:bg-green-700"
+              >
+                📩 Kirim ke WA Admin Sekarang
+              </button>
+              <button
+                onClick={() => handlePilihAksi("grup")}
+                className="w-full bg-emerald-700 text-white px-5 py-4 rounded-xl font-black text-xs shadow-md hover:bg-emerald-800"
+              >
+                👥 Kirim ke Grup WA Kelas
+              </button>
+              <button
+                onClick={() => handlePilihAksi("download")}
+                className="w-full bg-slate-100 text-slate-600 px-5 py-3 rounded-xl font-black text-[10px] shadow-sm hover:bg-slate-200"
+              >
+                ⬇️ Download PDF Saja (kirim manual nanti)
+              </button>
+            </div>
+
+            <p className="text-[9px] text-slate-400 leading-relaxed">
+              Di HP yang mendukung, file akan otomatis nempel di WhatsApp — tinggal pilih tujuannya. Kalau
+              tidak, surat akan otomatis terdownload dan WhatsApp terbuka, tinggal lampirkan filenya.
+            </p>
+
+            {sudahPilihAksi && (
+              <button
+                onClick={() => setShowKirimPanel(false)}
+                className="text-[10px] font-bold text-slate-400 hover:underline pt-1"
+              >
+                Tutup, saya sudah kirim ✓
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="max-w-2xl mx-auto bg-white p-6 md:p-10 rounded-[30px] shadow-xl border border-slate-200">
-        
         <div className="text-center mb-8">
           <h1 className="text-2xl font-black text-[#800020] uppercase tracking-tight">Form Perizinan Kuliah</h1>
           <p className="text-xs font-bold text-slate-400 mt-1">Lengkapi data untuk dikonfirmasi oleh Admin</p>
@@ -172,8 +373,8 @@ const SuratIzinMahasiswa = () => {
           </div>
         </div>
 
-        <button 
-          onClick={handleSubmit} 
+        <button
+          onClick={handleSubmit}
           disabled={loading}
           className={`w-full mt-10 py-5 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-[#800020] text-white hover:bg-black'}`}
         >

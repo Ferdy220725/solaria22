@@ -355,36 +355,38 @@ export default function SuperAdminPage() {
     doc.save(`Izin_${data.npm}.pdf`);
   };
 
- const toggleAbsensi = async (status: boolean) => {
-  const { error } = await supabase.from('status_sistem').update({ is_active: status }).eq('id', 'absensi');
-  if (!error) {
-    setAbsensiEnabled(status);
+  // ── FUNGSI GABUNGAN: status absensi + kode akses jadi SATU aksi & SATU notif ──
+  // Dipakai baik untuk toggle buka/tutup, maupun untuk update kode di tengah sesi
+  // (tanpa mengubah status) lewat tombol "Update kode saja".
+  const applyAbsensi = async (newStatus: boolean) => {
+    const kodeUpper = kodeAbsen.toUpperCase().trim();
 
-    // Notifikasi Telegram: status absensi diubah (sertakan kode akses kalau dibuka)
-    sendTelegramNotification(
-      `🚪 <b>STATUS ABSENSI DIUBAH</b>\n` +
-      `Status: <b>${status ? 'DIBUKA ✅' : 'DITUTUP ❌'}</b>` +
-      (status ? `\n🔑 Kode Akses: <code>${kodeAbsen.toUpperCase() || "-"}</code>` : '')
-    );
-
-    fetchData();
-  }
-};
-
- const updateKodeAbsen = async () => {
-  const { error } = await supabase.from('status_sistem').update({ kode_akses: kodeAbsen.toUpperCase() }).eq('id', 'absensi');
-  if (!error) {
-    alert("Kode Absen Berhasil Diperbarui!");
-
-    // Notif Telegram cuma dikirim kalau sesi absensi lagi aktif/dibuka
-    if (absensiEnabled) {
-      sendTelegramNotification(
-        `🔑 <b>KODE ABSEN DIPERBARUI</b>\n` +
-        `Kode baru: <code>${kodeAbsen.toUpperCase()}</code>`
-      );
+    if (newStatus && !kodeUpper) {
+      alert("Isi kode akses dulu sebelum membuka absensi!");
+      return;
     }
-  }
-};
+
+    const { error } = await supabase
+      .from('status_sistem')
+      .update({ is_active: newStatus, kode_akses: kodeUpper })
+      .eq('id', 'absensi');
+
+    if (!error) {
+      setAbsensiEnabled(newStatus);
+      setKodeAbsen(kodeUpper);
+
+      // Satu pesan gabungan: status + kode akses (kode cuma ditampilkan kalau sesi dibuka)
+      sendTelegramNotification(
+        `🚪 <b>STATUS ABSENSI</b>\n` +
+        `Status: <b>${newStatus ? 'DIBUKA ✅' : 'DITUTUP ❌'}</b>` +
+        (newStatus ? `\n🔑 Kode Akses: <code>${kodeUpper}</code>` : '')
+      );
+
+      fetchData();
+    } else {
+      alert("Gagal update: " + error.message);
+    }
+  };
 
   const hitungTotalPerTanggal = () => {
     const rekap: { [key: string]: number } = {};
@@ -570,20 +572,35 @@ export default function SuperAdminPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
-             <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-blue-600">
-                <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Pintu Absensi</h2>
-                <button onClick={() => toggleAbsensi(!absensiEnabled)} className={`w-full py-4 rounded-2xl font-black text-sm transition-all shadow-lg ${absensiEnabled ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-                  {absensiEnabled ? 'SISTEM: OPEN' : 'SISTEM: CLOSED'}
-                </button>
-             </div>
-             <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-[#800020]">
-                <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Kode Akses Hari Ini</h2>
-                <div className="flex gap-2">
-                  <input type="text" placeholder="SET KODE" className="flex-1 border-2 p-3 rounded-xl font-black text-center uppercase text-sm focus:border-[#800020] outline-none text-black" value={kodeAbsen} onChange={e => setKodeAbsen(e.target.value)} />
-                  <button onClick={updateKodeAbsen} className="bg-[#800020] text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-md">Simpan</button>
-                </div>
-             </div>
+          {/* KONTROL SESI ABSENSI — DIGABUNG: status + kode akses jadi 1 card, 1 aksi utama */}
+          <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-[#800020]">
+            <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Kontrol Sesi Absensi</h2>
+
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                placeholder="SET KODE"
+                className="flex-1 border-2 p-3 rounded-xl font-black text-center uppercase text-sm focus:border-[#800020] outline-none text-black"
+                value={kodeAbsen}
+                onChange={e => setKodeAbsen(e.target.value)}
+              />
+            </div>
+
+            <button
+              onClick={() => applyAbsensi(!absensiEnabled)}
+              className={`w-full py-4 rounded-2xl font-black text-sm transition-all shadow-lg ${absensiEnabled ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
+            >
+              {absensiEnabled ? 'SISTEM: OPEN (klik untuk tutup)' : 'SISTEM: CLOSED (klik untuk buka)'}
+            </button>
+
+            {/* Buat ganti kode di tengah sesi (misal sesi lagi OPEN) tanpa ikut menutup sesi.
+                Tetap pakai fungsi & notif Telegram yang sama, cuma status-nya dipertahankan. */}
+            <button
+              onClick={() => applyAbsensi(absensiEnabled)}
+              className="mt-3 text-[10px] font-bold text-slate-400 hover:underline"
+            >
+              Update kode saja (tanpa ubah status)
+            </button>
           </div>
 
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">

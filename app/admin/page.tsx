@@ -371,18 +371,20 @@ export default function SuperAdminPage() {
   }
 };
 
-  const updateKodeAbsen = async () => {
-    const { error } = await supabase.from('status_sistem').update({ kode_akses: kodeAbsen.toUpperCase() }).eq('id', 'absensi');
-    if (!error) {
-      alert("Kode Absen Berhasil Diperbarui!");
+ const updateKodeAbsen = async () => {
+  const { error } = await supabase.from('status_sistem').update({ kode_akses: kodeAbsen.toUpperCase() }).eq('id', 'absensi');
+  if (!error) {
+    alert("Kode Absen Berhasil Diperbarui!");
 
-      // Notifikasi Telegram: kode absen diperbarui
+    // Notif Telegram cuma dikirim kalau sesi absensi lagi aktif/dibuka
+    if (absensiEnabled) {
       sendTelegramNotification(
         `🔑 <b>KODE ABSEN DIPERBARUI</b>\n` +
         `Kode baru: <code>${kodeAbsen.toUpperCase()}</code>`
       );
     }
-  };
+  }
+};
 
   const hitungTotalPerTanggal = () => {
     const rekap: { [key: string]: number } = {};

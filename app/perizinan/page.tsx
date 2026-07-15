@@ -7,18 +7,26 @@ import { createClient } from "@/utils/supabase/client"; // Pastikan path ini ses
 
 // ── Kontak tujuan (ubah di sini kalau nomor/link grup berubah) ────────────
 const NOMOR_WA_ADMIN = "6282228731431"; // 0822... diubah ke format internasional 62
-const LINK_GRUP_WA = "https://chat.whatsapp.com/HsCgjIZE6pABuh5U2dABoj?s=cl&p=a&ilr=0&amv=3";
 
 const SuratIzinMahasiswa = () => {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
-  // State buat tahap "setelah submit": nyimpen PDF yang sudah jadi + status kirim
-  const [suratPdfFile, setSuratPdfFile] = useState<File | null>(null);
+  // State buat tahap "setelah submit": nyimpen link PDF (hasil upload ke Supabase Storage)
   const [suratPdfUrl, setSuratPdfUrl] = useState<string | null>(null);
   const [showKirimPanel, setShowKirimPanel] = useState(false);
   const [namaFilePdf, setNamaFilePdf] = useState("");
+
+  // Snapshot data yang dipakai buat nyusun template pesan WA
+  // (dipisah dari formData karena formData akan direset setelah submit)
+  const [dataTerkirim, setDataTerkirim] = useState({
+    namaLengkap: "",
+    npm: "",
+    namaMatkul: "",
+    tanggal: "",
+    alasan: "",
+  });
 
   const [formData, setFormData] = useState({
     namaMatkul: "",
@@ -100,65 +108,45 @@ const SuratIzinMahasiswa = () => {
     return doc;
   };
 
-  // ── Coba kirim file PDF langsung lewat Web Share API (share sheet native HP) ──
-  // User tetap yang milih WhatsApp + kontak/grup tujuan di share sheet-nya,
-  // tapi file-nya udah otomatis nempel, jadi cukup 1-2 tap doang.
-  const shareViaWebShare = async (pdfFile: File): Promise<boolean> => {
-    const nav = navigator as any;
-    if (!nav.share || !nav.canShare || !nav.canShare({ files: [pdfFile] })) {
-      return false;
-    }
-    try {
-      await nav.share({
-        files: [pdfFile],
-        title: "Surat Izin Kuliah",
-        text: `Surat izin kuliah atas nama ${formData.namaLengkap} (${formData.npm})`,
-      });
-      return true;
-    } catch (err) {
-      // User cancel share sheet, atau error lain — anggap gagal, biar fallback jalan
-      console.warn("Web Share dibatalkan/gagal:", err);
-      return false;
-    }
-  };
-
-  // ── Fallback: download PDF + buka WA dengan pesan siap pakai ──────────────
-  const openWaPersonal = () => {
-    const pesan = encodeURIComponent(
-      `Halo, saya ${formData.namaLengkap} (NPM: ${formData.npm}) ingin mengirimkan surat izin kuliah. Mohon tunggu, file PDF nya sudah otomatis terdownload, saya lampirkan di sini ya 🙏`
+  // ── Template pesan WA siap kirim: berisi ringkasan data + LINK PDF ──────────
+  // Admin/panitia grup tinggal buka link untuk lihat/download PDF sendiri,
+  // jadi mahasiswa tidak perlu repot download & lampirkan manual.
+  const buildPesanWa = (tujuan: "admin" | "grup") => {
+    const sapaan = tujuan === "admin" ? "Halo Admin," : "Halo teman-teman,";
+    return (
+      `${sapaan}\n` +
+      `Saya *${dataTerkirim.namaLengkap}* (NPM: ${dataTerkirim.npm}) ingin mengajukan izin kuliah.\n\n` +
+      `📚 Mata Kuliah: ${dataTerkirim.namaMatkul || "-"}\n` +
+      `📅 Tanggal Izin: ${dataTerkirim.tanggal || "-"}\n` +
+      `📝 Alasan: ${dataTerkirim.alasan || "-"}\n\n` +
+      `📄 Surat Izin (PDF): ${suratPdfUrl || "-"}\n\n` +
+      `Terima kasih banyak 🙏`
     );
-    window.open(`https://wa.me/${NOMOR_WA_ADMIN}?text=${pesan}`, "_blank");
   };
 
+  // ── Buka WhatsApp (personal admin) dengan pesan + link PDF sudah terisi ──
+  // PENTING: pakai api.whatsapp.com/send (bukan wa.me), karena wa.me adalah
+  // shortlink yang di-redirect dan di banyak HP Android suka merusak/memotong
+  // karakter emoji (4-byte UTF-8) saat proses redirect — hasilnya jadi "�".
+  // api.whatsapp.com/send adalah endpoint aslinya jadi encoding tetap utuh.
+  const openWaPersonal = () => {
+    const pesan = encodeURIComponent(buildPesanWa("admin"));
+    window.open(`https://api.whatsapp.com/send?phone=${NOMOR_WA_ADMIN}&text=${pesan}`, "_blank");
+  };
+
+  // ── Kirim ke grup WA. Link invite grup (chat.whatsapp.com/...) TIDAK support
+  // parameter ?text=, jadi nggak bisa auto-target pesan ke grup spesifik.
+  // Solusinya pakai link "send" WA TANPA nomor tujuan: ini akan membuka
+  // WhatsApp dengan pesan sudah terisi, lalu user tinggal PILIH grup tujuannya
+  // sendiri dari daftar chat (mirip fitur forward) — 2 tap doang, tanpa copy-paste.
   const openWaGrup = () => {
-    window.open(LINK_GRUP_WA, "_blank");
+    const pesan = encodeURIComponent(buildPesanWa("grup"));
+    window.open(`https://api.whatsapp.com/send?text=${pesan}`, "_blank");
   };
 
-  const downloadPdfManual = () => {
+  const bukaLinkPdf = () => {
     if (!suratPdfUrl) return;
-    const a = document.createElement("a");
-    a.href = suratPdfUrl;
-    a.download = namaFilePdf;
-    a.click();
-  };
-
-  const handleKirimWaPersonal = async () => {
-    if (!suratPdfFile) return;
-    const berhasil = await shareViaWebShare(suratPdfFile);
-    if (!berhasil) {
-      // Fallback: download dulu, baru buka chat WA-nya
-      downloadPdfManual();
-      openWaPersonal();
-    }
-  };
-
-  const handleKirimWaGrup = async () => {
-    if (!suratPdfFile) return;
-    const berhasil = await shareViaWebShare(suratPdfFile);
-    if (!berhasil) {
-      downloadPdfManual();
-      openWaGrup();
-    }
+    window.open(suratPdfUrl, "_blank");
   };
 
   const handleSubmit = async () => {
@@ -216,15 +204,38 @@ const SuratIzinMahasiswa = () => {
       // 4. Generate PDF surat izin dari data yang baru saja dikirim
       const doc = buildSuratPdf(formData, ttdMhsBase64, ttdOrtuBase64, lampiranUrl);
       const pdfBlob = doc.output("blob");
-      const fileName = `Izin_${formData.npm || "mahasiswa"}.pdf`;
-      const pdfFileObj = new File([pdfBlob], fileName, { type: "application/pdf" });
 
-      setSuratPdfFile(pdfFileObj);
-      setSuratPdfUrl(URL.createObjectURL(pdfBlob));
+      // Format nama file: NPM_NamaMahasiswa_KodeUnik.pdf
+      // (kode unik dari timestamp base36 supaya tiap submit jadi file baru, tidak bentrok/ketolak)
+      const namaBersih = formData.namaLengkap.trim().replace(/[^a-zA-Z0-9 _-]/g, "");
+      const kodeUnik = Date.now().toString(36).toUpperCase();
+      const fileName = `${formData.npm || "mahasiswa"}_${namaBersih || "mahasiswa"}_${kodeUnik}.pdf`;
+
+      // 5. Upload PDF hasil generate ke Supabase Storage supaya dapat LINK publik
+      //    (ini kunci utamanya: link jauh lebih reliable dibanding attach file
+      //    lewat Web Share API yang suka gagal di banyak device/WA versi tertentu)
+      const { error: uploadPdfError } = await supabase.storage
+        .from("uploads")
+        .upload(`surat/${fileName}`, pdfBlob, { contentType: "application/pdf", upsert: true });
+
+      if (uploadPdfError) throw uploadPdfError;
+
+      const { data: pdfUrlData } = supabase.storage.from("uploads").getPublicUrl(`surat/${fileName}`);
+
+      // Simpan snapshot data buat template pesan (sebelum formData direset)
+      setDataTerkirim({
+        namaLengkap: formData.namaLengkap,
+        npm: formData.npm,
+        namaMatkul: formData.namaMatkul,
+        tanggal: formData.tanggal,
+        alasan: formData.alasan,
+      });
+
+      setSuratPdfUrl(pdfUrlData.publicUrl);
       setNamaFilePdf(fileName);
       setShowKirimPanel(true);
 
-      // Reset form (surat & TTD tetap disimpan di state buat panel kirim)
+      // Reset form (data & link PDF tetap disimpan di state buat panel kirim)
       setFormData({ ...formData, namaMatkul: "", alasan: "", tanggal: "" });
       setFile(null);
       sigPadMhs.current?.clear();
@@ -237,14 +248,14 @@ const SuratIzinMahasiswa = () => {
     }
   };
 
-  // Tandai kalau user sudah menekan salah satu opsi kirim/download,
+  // Tandai kalau user sudah menekan salah satu opsi kirim,
   // supaya modal tidak lagi "memaksa" setelah aksi dilakukan.
   const [sudahPilihAksi, setSudahPilihAksi] = useState(false);
 
-  const handlePilihAksi = async (aksi: "wa" | "grup" | "download") => {
-    if (aksi === "wa") await handleKirimWaPersonal();
-    else if (aksi === "grup") await handleKirimWaGrup();
-    else downloadPdfManual();
+  const handlePilihAksi = async (aksi: "wa" | "grup" | "lihat") => {
+    if (aksi === "wa") openWaPersonal();
+    else if (aksi === "grup") openWaGrup();
+    else bukaLinkPdf();
     setSudahPilihAksi(true);
   };
 
@@ -262,8 +273,9 @@ const SuratIzinMahasiswa = () => {
               <p className="text-xs font-black text-[#800020] uppercase mt-1">Satu Langkah Lagi ⚠️</p>
             </div>
             <p className="text-[12px] text-slate-500 leading-relaxed">
-              Surat PDF kamu sudah siap. <b>Wajib dikirim ke Admin lewat WhatsApp</b> di bawah ini supaya
-              perizinanmu langsung diproses — laporan tidak dianggap masuk kalau surat belum dikirim.
+              Surat PDF kamu sudah siap dan sudah punya link. <b>Wajib dikirim ke Admin lewat WhatsApp</b> di
+              bawah ini supaya perizinanmu langsung diproses — laporan tidak dianggap masuk kalau surat belum
+              dikirim.
             </p>
 
             <div className="flex flex-col gap-3 pt-2">
@@ -280,16 +292,18 @@ const SuratIzinMahasiswa = () => {
                 👥 Kirim ke Grup WA Kelas
               </button>
               <button
-                onClick={() => handlePilihAksi("download")}
+                onClick={() => handlePilihAksi("lihat")}
                 className="w-full bg-slate-100 text-slate-600 px-5 py-3 rounded-xl font-black text-[10px] shadow-sm hover:bg-slate-200"
               >
-                ⬇️ Download PDF Saja (kirim manual nanti)
+                🔗 Lihat/Buka Link PDF Saja
               </button>
             </div>
 
             <p className="text-[9px] text-slate-400 leading-relaxed">
-              Di HP yang mendukung, file akan otomatis nempel di WhatsApp — tinggal pilih tujuannya. Kalau
-              tidak, surat akan otomatis terdownload dan WhatsApp terbuka, tinggal lampirkan filenya.
+              Pesan WA sudah otomatis terisi lengkap dengan link surat PDF-nya. Untuk "Kirim ke WA Admin",
+              chat langsung terbuka tinggal pencet kirim. Untuk "Kirim ke Grup", WhatsApp akan membuka daftar
+              chat kamu — tinggal pilih grup kelasnya, pesan sudah siap, lalu kirim. Admin akan buka link
+              tersebut untuk melihat/mengunduh suratnya sendiri.
             </p>
 
             {sudahPilihAksi && (

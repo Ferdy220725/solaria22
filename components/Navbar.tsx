@@ -231,13 +231,6 @@ export default function Navbar() {
               3
             </span>
           </Link>
-          <Link
-            href="/akun"
-            onClick={(e) => handleItemClick({ id: "akun", name: "Profil", href: "/akun", icon: null, comingSoon: true }, e)}
-            className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white"
-          >
-            <User size={16} />
-          </Link>
         </div>
       </header>
 

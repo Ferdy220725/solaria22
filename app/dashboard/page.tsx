@@ -21,7 +21,6 @@ import {
   Megaphone,
   ChevronLeft,
   ChevronRight,
-  User,
 } from 'lucide-react';
 
 // --- INTERFACE ---
@@ -29,6 +28,16 @@ interface Tugas {
   id: string;
   judul_tugas: string;
   mk_nama: string;
+  deadline: string;
+  deskripsi?: string;
+  link_pengumpulan?: string;
+}
+
+interface TugasPraktikum {
+  id: string;
+  judul_tugas: string;
+  mk_nama: string;
+  golongan: string;
   deadline: string;
   deskripsi?: string;
   link_pengumpulan?: string;
@@ -60,6 +69,7 @@ interface Pengumuman {
 export default function Dashboard() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [tugas, setTugas] = useState<Tugas[]>([]);
+  const [tugasPraktikum, setTugasPraktikum] = useState<TugasPraktikum[]>([]);
   const [displayName, setDisplayName] = useState('Sobat Agrotek');
   const [completedTaskIds, setCompletedTaskIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'perlu dikerjakan' | 'sudah selesai'>('perlu dikerjakan');
@@ -100,8 +110,11 @@ export default function Dashboard() {
   }, []);
 
   const fetchDataAndSync = async () => {
-    const { data } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
-    if (data) setTugas(data as Tugas[]);
+    const { data: teoriData } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
+    if (teoriData) setTugas(teoriData as Tugas[]);
+
+    const { data: praktikumData } = await supabase.from('tugas_praktikum').select('*').order('deadline', { ascending: true });
+    if (praktikumData) setTugasPraktikum(praktikumData as TugasPraktikum[]);
 
     const { data: zData } = await supabase.from('zoom_meetings').select('*').eq('is_active', true).order('waktu_mulai', { ascending: true });
     if (zData) setZoomMeetings(zData);
@@ -110,7 +123,7 @@ export default function Dashboard() {
       .from('jadwal_kuliah')
       .select('*')
       .eq('is_published', true)
-      .eq('day', todayName);
+      .eq('day', todayStr);
     if (jData) {
       setJadwalHariIni((jData as Jadwal[]).sort((a, b) => a.time.localeCompare(b.time)));
     }
@@ -242,9 +255,9 @@ export default function Dashboard() {
   );
 
   const tugasAktifCount = tugas.filter(t => !completedTaskIds.includes(t.id)).length;
+  const tugasPraktikumAktifCount = tugasPraktikum.filter(t => !completedTaskIds.includes(t.id)).length;
 
   const kelasHariIni = jadwalHariIni.filter(j => !j.subject.toLowerCase().includes('praktikum'));
-  const praktikumHariIni = jadwalHariIni.filter(j => j.subject.toLowerCase().includes('praktikum'));
 
   const tugasTerbaru = tugas.filter(t => !completedTaskIds.includes(t.id)).slice(0, 3);
 
@@ -297,19 +310,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#f7f7fb] dark:bg-[#0a0a0a] font-sans">
-
-      {/* TOP BAR - PROFIL */}
-      <div className="flex justify-end px-4 md:px-8 pt-4">
-        <button
-          onClick={() => router.push('/akun-saya')}
-          className="flex items-center gap-2 bg-white dark:bg-[#141414] border border-slate-100 dark:border-white/10 shadow-sm hover:shadow-md pl-2 pr-4 py-2 rounded-2xl text-xs font-black uppercase text-slate-700 dark:text-slate-200 active:scale-95 transition-all"
-        >
-          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shrink-0">
-            <User size={14} color="white" />
-          </div>
-          Profil
-        </button>
-      </div>
 
       {/* EXAM NOTIFICATION */}
       {(isETS || isEAS) && (
@@ -377,8 +377,8 @@ export default function Dashboard() {
                   <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 mb-3">
                     <FlaskConical size={20} />
                   </div>
-                  <p className="text-2xl font-black text-slate-900 dark:text-white">{praktikumHariIni.length}</p>
-                  <p className="text-xs text-slate-400 font-medium mb-1">Praktikum Hari Ini</p>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white">{tugasPraktikumAktifCount}</p>
+                  <p className="text-xs text-slate-400 font-medium mb-1">Tugas Praktikum</p>
                   <span className="text-xs font-bold text-indigo-600">Lihat detail</span>
                 </button>
 

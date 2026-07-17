@@ -292,11 +292,11 @@ export default function ModePresentasi({
 
         {/* Bar atas: nama sesi + tombol QR + tombol fullscreen, melayang di atas slide */}
         <div
-          className={`absolute top-0 left-0 right-0 bg-[#2b2b2b]/95 backdrop-blur text-white px-4 sm:px-6 py-3 flex items-center justify-between z-20 transition-all duration-300 ${
+          className={`absolute top-0 left-0 right-0 bg-[#141414]/95 backdrop-blur border-b border-white/10 text-white px-4 sm:px-6 py-3 flex items-center justify-between z-20 transition-all duration-300 ${
             hideUi ? "opacity-0 -translate-y-full pointer-events-none" : "opacity-100 translate-y-0"
           }`}
         >
-          <span className="font-semibold text-sm sm:text-base truncate">
+          <span className="font-black tracking-tight text-sm sm:text-base truncate">
             {namaSesi || "Sesi Presentasi"}
           </span>
 
@@ -304,7 +304,7 @@ export default function ModePresentasi({
             {qrDataUrl && (
               <button
                 onClick={() => setShowQrOverlay(true)}
-                className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-white"
+                className="flex items-center gap-2 text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition-colors"
               >
                 <QrCode size={16} />
                 <span className="hidden sm:inline">Tampilkan QR</span>
@@ -312,7 +312,7 @@ export default function ModePresentasi({
             )}
             <button
               onClick={toggleFullscreen}
-              className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 hover:text-white"
+              className="flex items-center gap-2 text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition-colors"
             >
               {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
               <span className="hidden sm:inline">
@@ -324,30 +324,30 @@ export default function ModePresentasi({
 
         {/* Kontrol bawah */}
         <div
-          className={`absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-4 bg-white/90 rounded-full px-3 sm:px-5 py-2 sm:py-3 shadow-xl max-w-[95vw] z-20 transition-all duration-300 ${
+          className={`absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-4 bg-white dark:bg-[#141414] border border-slate-100 dark:border-white/10 rounded-full px-3 sm:px-5 py-2 sm:py-3 shadow-xl max-w-[95vw] z-20 transition-all duration-300 ${
             hideUi ? "translate-y-24 opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
           }`}
         >
           <button
             onClick={() => goToSlide(slide - 1)}
             disabled={slide <= 1}
-            className="p-2 text-slate-800 disabled:text-slate-300"
+            className="p-2 text-slate-800 dark:text-slate-100 disabled:text-slate-300 dark:disabled:text-white/20 active:scale-95 transition-all"
           >
             <ChevronLeft />
           </button>
-          <span className="text-xs sm:text-sm font-bold min-w-[50px] sm:min-w-[60px] text-center text-slate-800">
+          <span className="text-xs sm:text-sm font-black min-w-[50px] sm:min-w-[60px] text-center text-slate-800 dark:text-white">
             {slide} / {totalPages}
           </span>
           <button
             onClick={() => goToSlide(slide + 1)}
             disabled={slide >= totalPages}
-            className="p-2 text-slate-800 disabled:text-slate-300"
+            className="p-2 text-slate-800 dark:text-slate-100 disabled:text-slate-300 dark:disabled:text-white/20 active:scale-95 transition-all"
           >
             <ChevronRight />
           </button>
           <button
             onClick={handleSelesai}
-            className="flex items-center gap-1 text-red-600 font-bold text-xs sm:text-sm ml-1 sm:ml-2 whitespace-nowrap"
+            className="flex items-center gap-1 text-red-500 dark:text-red-400 font-black text-xs sm:text-sm ml-1 sm:ml-2 whitespace-nowrap active:scale-95 transition-all"
           >
             <X size={16} /> <span className="hidden sm:inline">Selesai</span>
           </button>
@@ -361,20 +361,20 @@ export default function ModePresentasi({
           onClick={() => setShowQrOverlay(false)}
         >
           <div
-            className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center gap-4 max-w-[90vw]"
+            className="bg-white dark:bg-[#141414] border border-slate-100 dark:border-white/10 rounded-[28px] p-6 sm:p-8 shadow-2xl flex flex-col items-center gap-4 max-w-[90vw]"
             onClick={(e) => e.stopPropagation()}
           >
             <img
               src={qrDataUrl}
               alt="Scan untuk remote"
-              className="w-64 h-64 sm:w-96 sm:h-96 object-contain"
+              className="w-64 h-64 sm:w-96 sm:h-96 object-contain rounded-2xl"
             />
-            <p className="text-sm sm:text-base text-slate-600 font-medium text-center">
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 font-medium text-center">
               Scan QR ini untuk jadi remote presentasi
             </p>
             <button
               onClick={() => setShowQrOverlay(false)}
-              className="flex items-center gap-2 bg-[#800020] text-white font-bold text-sm px-5 py-2.5 rounded-full hover:opacity-90 transition"
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-xs tracking-widest px-5 py-3 rounded-full active:scale-95 transition-all"
             >
               <X size={16} /> Tutup QR
             </button>

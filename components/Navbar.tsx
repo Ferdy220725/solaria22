@@ -1,153 +1,298 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   LayoutDashboard,
+  ClipboardCheck,
+  FileText,
   BookOpen,
   FlaskConical,
-  FileText,
-  UserCog,
-  CalendarDays,
+  Users,
   MonitorPlay,
-  Info,
-  Shuffle,
-  ClipboardCheck,
-  User,
+  CalendarDays,
+  Sparkles,
+  Megaphone,
+  ClipboardList,
+  Settings,
+  HelpCircle,
+  Sprout,
   Menu,
   X,
+  Bell,
+  User,
+  QrCode,
 } from "lucide-react";
-import { useEffect, useState } from "react";
 
-const menuItems = [
-  { id: "m1", name: "Home", href: "/dashboard", icon: LayoutDashboard },
-  { id: "m_absensi", name: "Absensi", href: "/absensi", icon: ClipboardCheck },
-  { id: "m2", name: "Materi", href: "/materi", icon: BookOpen },
-  { id: "m_zora_ai", name: "ZORA AI", href: "/zora-ai", icon: null },
-  { id: "m3", name: "Praktikum", href: "/praktikum", icon: FlaskConical },
-  { id: "m_jadwal", name: "Jadwal", href: "/jadwal-sistem/list", icon: CalendarDays },
-  { id: "m_presentasi", name: "Presentasi", href: "/presentasi", icon: MonitorPlay },
-  { id: "m4", name: "Izin", href: "/perizinan", icon: FileText },
-  { id: "m_acak", name: "Acak Kelompok", href: "/acak-kelompok", icon: Shuffle },
-  { id: "m_akun", name: "Akun Saya", href: "/akun", icon: User },
-  { id: "m_tentang", name: "Tentang", href: "/tentang", icon: Info },
-  { id: "m5", name: "Admin", href: "/admin", icon: UserCog },
+interface NavItem {
+  id: string;
+  name: string;
+  href: string;
+  icon: React.ReactNode;
+  comingSoon?: boolean;
+  badge?: string;
+  external?: boolean;
+}
+
+const mainNavItems: NavItem[] = [
+  { id: "dashboard", name: "Dashboard", href: "/dashboard", icon: <LayoutDashboard size={20} /> },
+  { id: "absensi", name: "Absensi", href: "/absensi", icon: <ClipboardCheck size={20} /> },
+  { id: "perizinan", name: "Perizinan", href: "/perizinan", icon: <FileText size={20} /> },
+  { id: "materi", name: "Materi", href: "/materi", icon: <BookOpen size={20} /> },
+  { id: "praktikum", name: "Tugas Praktikum", href: "/praktikum", icon: <FlaskConical size={20} /> },
+  { id: "kelompok", name: "Acak Kelompok", href: "/kelompok", icon: <Users size={20} />, comingSoon: true },
+  { id: "presentasi", name: "Presentasi", href: "/presentasi", icon: <MonitorPlay size={20} />, badge: "QR" },
+  { id: "kalender", name: "Kalender Akademik", href: "/jadwal-sistem/list", icon: <CalendarDays size={20} /> },
+  { id: "zora-ai", name: "Zora AI", href: "/zora-ai", icon: <Sparkles size={20} />, comingSoon: true },
+  { id: "pengumuman", name: "Pengumuman", href: "/pengumuman", icon: <Megaphone size={20} /> },
+  { id: "laporan", name: "Laporan", href: "/laporan", icon: <ClipboardList size={20} />, comingSoon: true },
 ];
 
-// Halaman-halaman yang sudah punya bottom bar sendiri —
-// floating menu ini disembunyikan di sini supaya tidak tabrakan
-const HIDDEN_ON = ["/zora-ai"];
+const footerNavItems: NavItem[] = [
+  { id: "settings", name: "Admin", href: "/admin", icon: <Settings size={20} /> },
+  { id: "bantuan", name: "Bantuan & Tentang", href: "/tentang", icon: <HelpCircle size={20} /> },
+  {
+    id: "eksternal",
+    name: "Pertanian Perkotaan",
+    href: "https://pertanian-perkotaan-c.vercel.app/",
+    icon: <Sprout size={20} />,
+    external: true,
+  },
+];
 
-// Halaman MODE TAMPIL PRESENTASI (proyektor): /presentasi/{kode}/{itemId}
-// Sengaja pakai regex, bukan cuma prefix string, supaya BISA bedain dengan:
-//   - /presentasi              -> halaman listing, navbar tetap tampil
-//   - /presentasi/{kode}       -> halaman listing per-sesi, navbar tetap tampil
-//   - /presentasi/remote/...   -> halaman remote di HP, navbar tetap tampil
-// dan HANYA cocok untuk halaman mode tampil (2 segment setelah /presentasi/,
-// dengan segment pertama bukan "remote").
-const PRESENTASI_MODE_REGEX = /^\/presentasi\/(?!remote(\/|$))[^/]+\/[^/]+\/?$/;
+// 5 item utama buat bottom tab bar mobile (Zora AI selalu di tengah)
+const mobileTabItems: NavItem[] = [
+  { id: "dashboard", name: "Dashboard", href: "/dashboard", icon: <LayoutDashboard size={22} /> },
+  { id: "kalender", name: "Kalender", href: "/jadwal-sistem/list", icon: <CalendarDays size={22} /> },
+  { id: "zora-ai", name: "Zora AI", href: "/zora-ai", icon: <Sparkles size={24} />, comingSoon: true },
+  { id: "notifikasi", name: "Notifikasi", href: "/notifikasi", icon: <Bell size={22} />, comingSoon: true },
+  { id: "profil", name: "Profil", href: "/akun", icon: <User size={22} />, comingSoon: true },
+];
 
 export default function Navbar() {
   const pathname = usePathname();
   const [shouldShow, setShouldShow] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  useEffect(() => setShouldShow(true), []);
-  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    setShouldShow(true);
+  }, [pathname]);
 
-  if (!shouldShow) return null;
+  useEffect(() => {
+    setIsDrawerOpen(false);
+  }, [pathname]);
 
-  const isHiddenByList = HIDDEN_ON.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  // Sembunyikan navbar SEPENUHNYA saat browser dalam mode fullscreen
+  // (misalnya saat mode presentasi layar penuh sedang aktif)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fsElement =
+        document.fullscreenElement || (document as any).webkitFullscreenElement;
+      setIsFullscreen(!!fsElement);
+      if (fsElement) setIsDrawerOpen(false);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  if (!shouldShow || isFullscreen) return null;
+
+  const handleItemClick = (item: NavItem, e: React.MouseEvent) => {
+    if (item.comingSoon) {
+      e.preventDefault();
+      toast.info(`${item.name} segera hadir 🚧`, {
+        description: "Fitur ini masih dalam pengembangan.",
+      });
+    }
+  };
+
+  const isActive = (href: string) => pathname === href;
+
+  const renderNavLink = (item: NavItem, variant: "sidebar" | "drawer") => (
+    <Link
+      key={item.id}
+      href={item.href}
+      onClick={(e) => handleItemClick(item, e)}
+      target={item.external ? "_blank" : undefined}
+      rel={item.external ? "noopener noreferrer" : undefined}
+      className={`group flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+        isActive(item.href)
+          ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+          : "text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-white/5 hover:text-indigo-700 dark:hover:text-white"
+      } ${item.comingSoon ? "opacity-60" : ""}`}
+    >
+      <span className="flex items-center gap-3">
+        <span className={isActive(item.href) ? "text-white" : "text-indigo-500 dark:text-indigo-400"}>
+          {item.icon}
+        </span>
+        {item.name}
+      </span>
+      {item.badge && (
+        <span
+          className={`flex items-center gap-1 text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+            isActive(item.href) ? "bg-white/20 text-white" : "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"
+          }`}
+        >
+          <QrCode size={11} /> {item.badge}
+        </span>
+      )}
+      {item.comingSoon && (
+        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-400">
+          Segera
+        </span>
+      )}
+    </Link>
   );
-  const isPresentasiMode = PRESENTASI_MODE_REGEX.test(pathname);
-  const isHidden = isHiddenByList || isPresentasiMode;
-  if (isHidden) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] flex justify-end pointer-events-none">
-      <div
-        className="pointer-events-auto inline-flex items-center rounded-full backdrop-blur-xl border border-white/25 shadow-2xl overflow-hidden"
-        style={{ backgroundColor: "rgba(128,0,32,0.85)" }}
-      >
-        <div
-          className="flex items-center gap-1 overflow-x-auto no-scrollbar snap-x snap-mandatory"
-          style={{
-            maxWidth: open ? "calc(100vw - 104px)" : "0px",
-            paddingLeft: open ? 6 : 0,
-            paddingRight: open ? 4 : 0,
-            transition: "max-width 380ms cubic-bezier(0.32,0.72,0,1), padding 380ms ease",
-            scrollbarWidth: "none",
-          }}
-        >
-          {menuItems.map((item, idx) => {
-            const Icon = item.icon;
-            const active = pathname === item.href;
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className="relative shrink-0 w-11 h-11 flex items-center justify-center rounded-full snap-center active:scale-90"
-                style={{
-                  backgroundColor: active ? "#ffffff" : "transparent",
-                  opacity: open ? 1 : 0,
-                  transform: open ? "translateY(0) scale(1)" : "translateY(6px) scale(0.7)",
-                  transition: "opacity 300ms ease, transform 300ms cubic-bezier(0.34,1.56,0.64,1)",
-                  transitionDelay: open ? `${idx * 35 + 80}ms` : "0ms",
-                }}
-              >
-                {item.id === "m_zora_ai" ? (
-                  <Image
-                    src="/icons/zora-mark.png"
-                    alt="ZORA AI"
-                    width={22}
-                    height={22}
-                    className="object-contain"
-                  />
-                ) : (
-                  Icon && (
-                    <Icon
-                      size={19}
-                      color={active ? "#800020" : "rgba(255,255,255,0.9)"}
-                      strokeWidth={2}
-                    />
-                  )
-                )}
-              </Link>
-            );
-          })}
+    <>
+      {/* ================= DESKTOP SIDEBAR ================= */}
+      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-64 md:z-50 bg-white dark:bg-[#0d0d0d] border-r border-slate-200 dark:border-white/10">
+        <div className="flex items-center gap-2 px-5 h-20 border-b border-slate-100 dark:border-white/10 shrink-0">
+          <div className="w-12 h-12 flex items-center justify-center shrink-0">
+            <img src="/logo-zora.png" alt="Zora" className="w-full h-full object-cover" />
+          </div>
+          <span className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+            ZORA
+          </span>
         </div>
 
-        <button
-          onClick={() => setOpen((v) => !v)}
-          aria-label={open ? "Tutup menu" : "Buka menu"}
-          className="shrink-0 w-14 h-14 rounded-full flex items-center justify-center active:scale-90 transition-transform"
-        >
-          <div className="relative w-6 h-6">
-            <Menu
-              size={24}
-              color="#ffffff"
-              strokeWidth={2}
-              className="absolute inset-0 transition-all duration-300"
-              style={{
-                opacity: open ? 0 : 1,
-                transform: open ? "rotate(90deg) scale(0.6)" : "rotate(0deg) scale(1)",
-              }}
-            />
-            <X
-              size={24}
-              color="#ffffff"
-              strokeWidth={2}
-              className="absolute inset-0 transition-all duration-300"
-              style={{
-                opacity: open ? 1 : 0,
-                transform: open ? "rotate(0deg) scale(1)" : "rotate(-90deg) scale(0.6)",
-              }}
-            />
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          {mainNavItems.map((item) => renderNavLink(item, "sidebar"))}
+        </nav>
+
+        <div className="px-3 pb-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-4 text-white mb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles size={16} />
+              <p className="text-xs font-black uppercase tracking-wide">Zora AI Assistant</p>
+            </div>
+            <p className="text-[11px] text-indigo-100 mb-3">
+              Tanya apa saja seputar perkuliahan!
+            </p>
+            <button
+              onClick={(e) =>
+                handleItemClick(mainNavItems.find((i) => i.id === "zora-ai")!, e as any)
+              }
+              className="w-full bg-white/15 hover:bg-white/25 backdrop-blur-sm rounded-xl py-2 text-xs font-bold transition-all"
+            >
+              Chat dengan AI →
+            </button>
           </div>
-        </button>
-      </div>
-    </div>
+
+          <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-white/10">
+            {footerNavItems.map((item) => renderNavLink(item, "sidebar"))}
+          </div>
+        </div>
+      </aside>
+
+      {/* ================= MOBILE TOP HEADER ================= */}
+      <header className="md:hidden fixed top-0 inset-x-0 z-50 h-16 bg-white/95 dark:bg-[#0d0d0d]/95 backdrop-blur-md border-b border-slate-200 dark:border-white/10 flex items-center justify-between px-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsDrawerOpen(true)}
+            className="w-9 h-9 rounded-xl border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200"
+            aria-label="Buka menu"
+          >
+            <Menu size={18} />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 flex items-center justify-center shrink-0">
+              <img src="/logo-zora.png" alt="Zora" className="w-full h-full object-cover" />
+            </div>
+            <span className="font-black text-lg text-slate-900 dark:text-white tracking-tight">ZORA</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Link
+            href="/notifikasi"
+            onClick={(e) => handleItemClick({ id: "notif", name: "Notifikasi", href: "/notifikasi", icon: null, comingSoon: true }, e)}
+            className="relative w-9 h-9 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200"
+          >
+            <Bell size={16} />
+            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+              3
+            </span>
+          </Link>
+          <Link
+            href="/akun"
+            onClick={(e) => handleItemClick({ id: "akun", name: "Profil", href: "/akun", icon: null, comingSoon: true }, e)}
+            className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white"
+          >
+            <User size={16} />
+          </Link>
+        </div>
+      </header>
+
+      {/* ================= MOBILE DRAWER (full menu) ================= */}
+      {isDrawerOpen && (
+        <div className="md:hidden fixed inset-0 z-[60] flex">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setIsDrawerOpen(false)}
+          />
+          <div className="relative w-[78%] max-w-xs h-full bg-white dark:bg-[#0d0d0d] shadow-2xl flex flex-col animate-in slide-in-from-left duration-300">
+            <div className="flex items-center justify-between px-5 h-16 border-b border-slate-100 dark:border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                  <img src="/logo-zora.png" alt="Zora" className="w-full h-full object-cover" />
+                </div>
+                <span className="font-black text-lg text-slate-900 dark:text-white">ZORA</span>
+              </div>
+              <button
+                onClick={() => setIsDrawerOpen(false)}
+                className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-white/10 flex items-center justify-center"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+              {mainNavItems.map((item) => renderNavLink(item, "drawer"))}
+              <div className="pt-3 mt-3 border-t border-slate-100 dark:border-white/10 space-y-1">
+                {footerNavItems.map((item) => renderNavLink(item, "drawer"))}
+              </div>
+            </nav>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MOBILE BOTTOM TAB BAR ================= */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 h-[68px] bg-white/95 dark:bg-[#0d0d0d]/95 backdrop-blur-md border-t border-slate-200 dark:border-white/10 flex items-center justify-around px-2">
+        {mobileTabItems.map((item) =>
+          item.id === "zora-ai" ? (
+            <Link
+              key={item.id}
+              href={item.href}
+              onClick={(e) => handleItemClick(item, e)}
+              className="-mt-7 w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 shadow-lg shadow-indigo-600/40 flex items-center justify-center text-white active:scale-90 transition-all"
+            >
+              {item.icon}
+            </Link>
+          ) : (
+            <Link
+              key={item.id}
+              href={item.href}
+              onClick={(e) => handleItemClick(item, e)}
+              className={`flex flex-col items-center gap-1 px-2 py-1 text-[10px] font-bold ${
+                isActive(item.href) ? "text-indigo-600" : "text-slate-400 dark:text-slate-500"
+              }`}
+            >
+              {item.icon}
+              {item.name}
+            </Link>
+          )
+        )}
+      </nav>
+    </>
   );
 }

@@ -48,6 +48,13 @@ export default function SuperAdminPage() {
   const [semesterMateri, setSemesterMateri] = useState(''); // State Baru untuk Input Semester Materi
   const [file, setFile] = useState<File | null>(null);
 
+  // --- STATE PENGUMUMAN (BARU) ---
+  const [pengumuman, setPengumuman] = useState<any[]>([]);
+  const [judulPengumuman, setJudulPengumuman] = useState('');
+  const [isiPengumuman, setIsiPengumuman] = useState('');
+  const [linkPengumuman, setLinkPengumuman] = useState('');
+  const [pinPengumuman, setPinPengumuman] = useState(false);
+
   // --- HELPER ---
   const formatToWIB = (dateString: string) => {
     if (!dateString) return null;
@@ -82,6 +89,14 @@ export default function SuperAdminPage() {
       // --- LOGIKA ZOOM (DATABASE CRON ENABLED) ---
       const { data: dZoomRaw } = await supabase.from('zoom_meetings').select('*').order('waktu_mulai', { ascending: true });
       if (dZoomRaw) setZoomMeetings(dZoomRaw);
+
+      // --- FETCH PENGUMUMAN (BARU) ---
+      const { data: dPengumuman } = await supabase
+        .from('pengumuman')
+        .select('*')
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (dPengumuman) setPengumuman(dPengumuman);
 
       if (dIzin) setIzins(dIzin);
 
@@ -316,6 +331,34 @@ export default function SuperAdminPage() {
     }
   };
 
+  // --- HANDLER PENGUMUMAN (BARU) ---
+  const handlePostPengumuman = async () => {
+    if (!judulPengumuman.trim() || !isiPengumuman.trim()) {
+      return alert("Judul dan isi pengumuman wajib diisi!");
+    }
+    const { error } = await supabase.from('pengumuman').insert([{
+      judul: judulPengumuman.trim(),
+      isi: isiPengumuman.trim(),
+      link: linkPengumuman.trim() || null,
+      is_pinned: pinPengumuman,
+    }]);
+    if (error) return alert("Gagal posting pengumuman: " + error.message);
+
+    // Notifikasi Telegram: pengumuman baru
+    sendTelegramNotification(
+      `📢 <b>PENGUMUMAN BARU</b>\n` +
+      `${judulPengumuman.trim()}\n\n` +
+      `${isiPengumuman.trim()}` +
+      (linkPengumuman.trim() ? `\n\nLink: ${linkPengumuman.trim()}` : '')
+    );
+
+    setJudulPengumuman('');
+    setIsiPengumuman('');
+    setLinkPengumuman('');
+    setPinPengumuman(false);
+    fetchData();
+  };
+
   const downloadPDF = async (data: any) => {
     const doc = new jsPDF();
     doc.setFont("times", "bold");
@@ -355,36 +398,31 @@ export default function SuperAdminPage() {
     doc.save(`Izin_${data.npm}.pdf`);
   };
 
-  // ── FUNGSI GABUNGAN: status absensi + kode akses jadi SATU aksi & SATU notif ──
-  // Dipakai baik untuk toggle buka/tutup, maupun untuk update kode di tengah sesi
-  // (tanpa mengubah status) lewat tombol "Update kode saja".
-  const applyAbsensi = async (newStatus: boolean) => {
-    const kodeUpper = kodeAbsen.toUpperCase().trim();
-
-    if (newStatus && !kodeUpper) {
-      alert("Isi kode akses dulu sebelum membuka absensi!");
-      return;
-    }
-
-    const { error } = await supabase
-      .from('status_sistem')
-      .update({ is_active: newStatus, kode_akses: kodeUpper })
-      .eq('id', 'absensi');
-
+  const toggleAbsensi = async (status: boolean) => {
+    const { error } = await supabase.from('status_sistem').update({ is_active: status }).eq('id', 'absensi');
     if (!error) {
-      setAbsensiEnabled(newStatus);
-      setKodeAbsen(kodeUpper);
+      setAbsensiEnabled(status);
 
-      // Satu pesan gabungan: status + kode akses (kode cuma ditampilkan kalau sesi dibuka)
+      // Notifikasi Telegram: status absensi diubah
       sendTelegramNotification(
-        `🚪 <b>STATUS ABSENSI</b>\n` +
-        `Status: <b>${newStatus ? 'DIBUKA ✅' : 'DITUTUP ❌'}</b>` +
-        (newStatus ? `\n🔑 Kode Akses: <code>${kodeUpper}</code>` : '')
+        `🚪 <b>STATUS ABSENSI DIUBAH</b>\n` +
+        `Status: <b>${status ? 'DIBUKA ✅' : 'DITUTUP ❌'}</b>`
       );
 
       fetchData();
-    } else {
-      alert("Gagal update: " + error.message);
+    }
+  };
+
+  const updateKodeAbsen = async () => {
+    const { error } = await supabase.from('status_sistem').update({ kode_akses: kodeAbsen.toUpperCase() }).eq('id', 'absensi');
+    if (!error) {
+      alert("Kode Absen Berhasil Diperbarui!");
+
+      // Notifikasi Telegram: kode absen diperbarui
+      sendTelegramNotification(
+        `🔑 <b>KODE ABSEN DIPERBARUI</b>\n` +
+        `Kode baru: <code>${kodeAbsen.toUpperCase()}</code>`
+      );
     }
   };
 
@@ -500,6 +538,74 @@ export default function SuperAdminPage() {
             </div>
           </div>
 
+          {/* MANAJEMEN PENGUMUMAN (BARU) */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-indigo-600">
+            <h2 className="font-black mb-4 text-indigo-700 uppercase text-xs">📢 Post Pengumuman</h2>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <input
+                  type="text"
+                  placeholder="Judul Pengumuman"
+                  className="w-full border p-3 mb-2 rounded-xl text-xs text-black"
+                  value={judulPengumuman}
+                  onChange={e => setJudulPengumuman(e.target.value)}
+                />
+                <textarea
+                  placeholder="Isi pengumuman..."
+                  className="w-full border p-3 mb-2 rounded-xl text-xs min-h-[100px] text-black"
+                  value={isiPengumuman}
+                  onChange={e => setIsiPengumuman(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="Link (opsional) — https://..."
+                  className="w-full border p-3 mb-2 rounded-xl text-xs bg-indigo-50 text-black"
+                  value={linkPengumuman}
+                  onChange={e => setLinkPengumuman(e.target.value)}
+                />
+                <label className="flex items-center gap-2 mb-4 text-[10px] font-black text-slate-500 uppercase cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={pinPengumuman}
+                    onChange={e => setPinPengumuman(e.target.checked)}
+                  />
+                  📌 Sematkan di atas (pin)
+                </label>
+                <button onClick={handlePostPengumuman} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-xs shadow-md">
+                  PUBLISH PENGUMUMAN
+                </button>
+              </div>
+
+              <div className="max-h-[280px] overflow-y-auto pr-1 space-y-2">
+                {pengumuman.length > 0 ? pengumuman.map((p) => (
+                  <div key={p.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="flex justify-between items-start gap-2">
+                      <div>
+                        <p className="text-[11px] font-black text-slate-800 flex items-center gap-1">
+                          {p.is_pinned && <span>📌</span>} {p.judul}
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-bold mt-0.5">
+                          {new Date(p.created_at).toLocaleString('id-ID')}
+                        </p>
+                      </div>
+                      <button onClick={() => deleteData(p.id, 'pengumuman')} className="text-red-500 text-[9px] font-black hover:underline shrink-0">
+                        HAPUS
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-1 line-clamp-2">{p.isi}</p>
+                    {p.link && (
+                      <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-[9px] font-black text-indigo-600 hover:underline mt-1 inline-block truncate max-w-full">
+                        🔗 {p.link}
+                      </a>
+                    )}
+                  </div>
+                )) : (
+                  <p className="text-[10px] font-bold text-slate-400 italic">Belum ada pengumuman.</p>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
               <h3 className="font-black text-xs uppercase mb-4 text-slate-400">Daftar Tugas Aktif</h3>
@@ -572,35 +678,20 @@ export default function SuperAdminPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* KONTROL SESI ABSENSI — DIGABUNG: status + kode akses jadi 1 card, 1 aksi utama */}
-          <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-[#800020]">
-            <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Kontrol Sesi Absensi</h2>
-
-            <div className="flex gap-2 mb-4">
-              <input
-                type="text"
-                placeholder="SET KODE"
-                className="flex-1 border-2 p-3 rounded-xl font-black text-center uppercase text-sm focus:border-[#800020] outline-none text-black"
-                value={kodeAbsen}
-                onChange={e => setKodeAbsen(e.target.value)}
-              />
-            </div>
-
-            <button
-              onClick={() => applyAbsensi(!absensiEnabled)}
-              className={`w-full py-4 rounded-2xl font-black text-sm transition-all shadow-lg ${absensiEnabled ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
-            >
-              {absensiEnabled ? 'SISTEM: OPEN (klik untuk tutup)' : 'SISTEM: CLOSED (klik untuk buka)'}
-            </button>
-
-            {/* Buat ganti kode di tengah sesi (misal sesi lagi OPEN) tanpa ikut menutup sesi.
-                Tetap pakai fungsi & notif Telegram yang sama, cuma status-nya dipertahankan. */}
-            <button
-              onClick={() => applyAbsensi(absensiEnabled)}
-              className="mt-3 text-[10px] font-bold text-slate-400 hover:underline"
-            >
-              Update kode saja (tanpa ubah status)
-            </button>
+          <div className="grid md:grid-cols-2 gap-6">
+             <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-blue-600">
+                <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Pintu Absensi</h2>
+                <button onClick={() => toggleAbsensi(!absensiEnabled)} className={`w-full py-4 rounded-2xl font-black text-sm transition-all shadow-lg ${absensiEnabled ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+                  {absensiEnabled ? 'SISTEM: OPEN' : 'SISTEM: CLOSED'}
+                </button>
+             </div>
+             <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-[#800020]">
+                <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Kode Akses Hari Ini</h2>
+                <div className="flex gap-2">
+                  <input type="text" placeholder="SET KODE" className="flex-1 border-2 p-3 rounded-xl font-black text-center uppercase text-sm focus:border-[#800020] outline-none text-black" value={kodeAbsen} onChange={e => setKodeAbsen(e.target.value)} />
+                  <button onClick={updateKodeAbsen} className="bg-[#800020] text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-md">Simpan</button>
+                </div>
+             </div>
           </div>
 
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">

@@ -23,54 +23,45 @@ export default function LandingPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center p-6 text-center relative overflow-hidden"
-      style={{ background: 'radial-gradient(ellipse 120% 60% at 50% -10%, #EAF1E3 0%, #FBF7ED 45%, #FBF7ED 100%)' }}
-    >
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;0,900;1,600;1,700&family=Manrope:wght@500;700;800&display=swap');
-        .font-display { font-family: 'Fraunces', serif; }
-        .font-body { font-family: 'Manrope', sans-serif; }
-      `}</style>
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center relative overflow-hidden bg-[#f7f7fb] dark:bg-[#0a0a0a] font-sans">
+      {/* Aksen gradasi lembut di pojok, senada tema indigo/purple dashboard */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(circle_at_1px_1px,#4f46e5_1px,transparent_0)] [background-size:32px_32px] pointer-events-none" />
 
-      {/* Aksen gradasi lembut di pojok, kesan "cahaya ladang" */}
-      <div
-        className="absolute -top-32 -left-32 w-96 h-96 rounded-full blur-3xl opacity-40 pointer-events-none"
-        style={{ background: 'radial-gradient(circle, #0B3D2E, transparent 70%)' }}
-      />
-      <div
-        className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full blur-3xl opacity-40 pointer-events-none"
-        style={{ background: 'radial-gradient(circle, #7A1128, transparent 70%)' }}
-      />
+      <div className="relative z-10 flex flex-col items-center max-w-lg">
+        {/* CARD UTAMA */}
+        <div className="bg-white dark:bg-[#141414] rounded-[32px] p-8 md:p-12 shadow-xl border border-slate-100 dark:border-white/10 flex flex-col items-center">
+          <img
+            src="/logo-zora.png"
+            alt="Logo Zora"
+            className="w-20 h-20 md:w-24 md:h-24 object-contain drop-shadow-lg mb-6"
+          />
 
-      <div className="relative z-10 flex flex-col items-center font-body">
-        <img
-          src="/logo-zora.jpg"
-          alt="Logo Zora"
-          className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-4 border-white shadow-2xl mb-6"
-        />
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 px-4 py-1.5 rounded-full mb-4">
+            Kelas C Agroteknologi
+          </span>
 
-        <p className="text-[10px] font-black uppercase tracking-[0.35em] text-[#7A1128]/70 mb-3">
-          Kelas C Agroteknologi
-        </p>
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900 dark:text-white mb-4 leading-tight">
+            Selamat Datang di{' '}
+            <span className="bg-gradient-to-br from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              Zora
+            </span>
+          </h1>
 
-        <h1 className="font-display italic font-bold text-3xl md:text-5xl tracking-tight text-[#0B3D2E] mb-4">
-          Selamat Datang di <span className="not-italic font-black uppercase text-[#7A1128]">Zora</span>
-        </h1>
+          <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 font-medium mb-8 leading-relaxed">
+            Zora adalah sistem manajemen Kelas C Agroteknologi — pantau tugas, deadline,
+            absensi, dan jadwal Zoom kelas dalam satu tempat.
+          </p>
 
-        <p className="max-w-md text-sm md:text-base text-slate-600 font-medium mb-10 leading-relaxed">
-          Zora adalah sistem manajemen Kelas C Agroteknologi — pantau tugas, deadline,
-          absensi, dan jadwal Zoom kelas dalam satu tempat.
-        </p>
-
-        <button
-          onClick={handleMasuk}
-          disabled={checkingSession}
-          className="text-white px-10 py-4 rounded-2xl font-black uppercase tracking-wider text-sm shadow-xl active:scale-95 transition-all disabled:opacity-50"
-          style={{ background: 'linear-gradient(135deg, #7A1128, #5a0016)' }}
-        >
-          {checkingSession ? 'Memuat...' : 'Masuk'}
-        </button>
+          <button
+            onClick={handleMasuk}
+            disabled={checkingSession}
+            className="w-full bg-gradient-to-br from-indigo-600 to-purple-600 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-wider text-sm shadow-lg shadow-indigo-600/30 active:scale-95 transition-all disabled:opacity-50"
+          >
+            {checkingSession ? 'Memuat...' : 'Masuk'}
+          </button>
+        </div>
       </div>
     </div>
   );

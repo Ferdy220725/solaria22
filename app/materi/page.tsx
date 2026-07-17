@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
+import { BookOpen, PackageOpen } from 'lucide-react';
 
 // --- KOMPONEN INTERAKTIF (3D EFFECT) ---
 function InteractiveCard({ children }: { children: React.ReactNode }) {
@@ -54,7 +55,7 @@ export default function MateriPage() {
   const [materiList, setMateriList] = useState<Materi[]>([]);
   const [filter, setFilter] = useState('Semua');
   const [filterSemester, setFilterSemester] = useState('Semua'); // State baru untuk filter semester
-  
+
   const supabase = createClient();
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function MateriPage() {
         .from('materi')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) {
         console.error("Gagal ambil data Supabase:", error.message);
       } else if (data) {
@@ -84,7 +85,7 @@ export default function MateriPage() {
         .map(m => m.mk_nama)
     )
   );
-  
+
   // Logika Filter Ganda: Memfilter berdasarkan Mata Kuliah DAN Semester sekaligus
   const filteredMateri = materiList.filter(m => {
     const matchMK = filter === 'Semua' || m.mk_nama === filter;
@@ -93,87 +94,94 @@ export default function MateriPage() {
   });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto min-h-screen bg-[#f8f9fa] pb-32">
-      {/* Header & Filter */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-6">
-        <div>
-          <h1 className="text-4xl font-black text-[#800020] uppercase italic tracking-tighter">
-            Materi Kuliah
-          </h1>
-          <p className="text-gray-400 font-medium text-sm mt-1">Eksplorasi bahan ajar Agroteknologi</p>
-        </div>
-        
-        {/* Container Filter */}
-        <div className="flex flex-wrap gap-4 w-full md:w-auto">
-          {/* Filter Semester */}
-          <select
-            className="bg-white border-none shadow-[5px_5px_15px_#d1d1d1,-5px_-5px_15px_#ffffff] p-4 rounded-2xl font-bold text-xs uppercase tracking-widest text-[#800020] outline-none cursor-pointer hover:scale-105 transition-transform"
-            value={filterSemester}
-            onChange={(e) => {
-              setFilterSemester(e.target.value);
-              setFilter('Semua'); // Otomatis reset filter matkul saat semester berubah agar tidak macet
-            }}
-          >
-            <option value="Semua">Semua Semester</option>
-            {daftarSemester.map(sem => (
-              <option key={String(sem)} value={String(sem)}>Semester {sem}</option>
-            ))}
-          </select>
+    <div className="min-h-screen bg-[#f7f7fb] dark:bg-[#0a0a0a] font-sans pb-32">
+      <div className="p-4 md:p-8 max-w-[1400px] mx-auto">
 
-          {/* Filter Mata Kuliah Lama - Isinya dinamis disaring oleh pilihan Semester di atas */}
-          <select
-            className="bg-white border-none shadow-[5px_5px_15px_#d1d1d1,-5px_-5px_15px_#ffffff] p-4 rounded-2xl font-bold text-xs uppercase tracking-widest text-[#800020] outline-none cursor-pointer hover:scale-105 transition-transform"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          >
-            <option value="Semua">Semua Mata Kuliah</option>
-            {daftarMK.map(mk => <option key={mk} value={mk}>{mk}</option>)}
-          </select>
-        </div>
-      </div>
+        {/* Header & Filter */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+              Materi Kuliah
+            </h1>
+            <p className="text-slate-400 font-medium text-sm mt-1">Eksplorasi bahan ajar Agroteknologi</p>
+          </div>
 
-      {/* Grid Materi dengan Efek Timbul & Interaktif */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-        {filteredMateri.map((m) => (
-          <InteractiveCard key={m.id}>
-            <div className="bg-[#f8f9fa] p-8 rounded-[40px] flex flex-col justify-between h-full border border-white/50 shadow-[20px_20px_40px_#d1d1d1,-20px_-20px_40px_#ffffff] transition-colors hover:bg-white group">
-              <div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-[10px] font-black text-[#800020] uppercase bg-red-50 px-4 py-2 rounded-full border border-red-100 tracking-[0.2em]">
-                    {m.mk_nama}
-                  </span>
-                  {m.semester && (
-                    <span className="text-[10px] font-black text-gray-600 uppercase bg-gray-100 px-4 py-2 rounded-full border border-gray-200 tracking-[0.2em]">
-                      Smstr {m.semester}
+          {/* Container Filter */}
+          <div className="flex flex-wrap gap-3 w-full md:w-auto">
+            {/* Filter Semester */}
+            <select
+              className="bg-white dark:bg-[#141414] border border-slate-100 dark:border-white/10 shadow-sm px-4 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest text-indigo-600 dark:text-indigo-400 outline-none cursor-pointer active:scale-95 transition-all"
+              value={filterSemester}
+              onChange={(e) => {
+                setFilterSemester(e.target.value);
+                setFilter('Semua'); // Otomatis reset filter matkul saat semester berubah agar tidak macet
+              }}
+            >
+              <option value="Semua">Semua Semester</option>
+              {daftarSemester.map(sem => (
+                <option key={String(sem)} value={String(sem)}>Semester {sem}</option>
+              ))}
+            </select>
+
+            {/* Filter Mata Kuliah - Isinya dinamis disaring oleh pilihan Semester di atas */}
+            <select
+              className="bg-white dark:bg-[#141414] border border-slate-100 dark:border-white/10 shadow-sm px-4 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest text-indigo-600 dark:text-indigo-400 outline-none cursor-pointer active:scale-95 transition-all"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
+              <option value="Semua">Semua Mata Kuliah</option>
+              {daftarMK.map(mk => <option key={mk} value={mk}>{mk}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Grid Materi */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredMateri.map((m) => (
+            <InteractiveCard key={m.id}>
+              <div className="bg-white dark:bg-[#141414] p-6 rounded-[28px] flex flex-col justify-between h-full border border-slate-100 dark:border-white/10 shadow-sm transition-all group">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                      <BookOpen size={18} />
+                    </div>
+                    <span className="text-[9px] font-black text-indigo-700 dark:text-indigo-400 uppercase bg-indigo-100 dark:bg-indigo-500/10 px-2.5 py-1 rounded-lg tracking-widest">
+                      {m.mk_nama}
                     </span>
-                  )}
+                    {m.semester && (
+                      <span className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase bg-slate-100 dark:bg-white/5 px-2.5 py-1 rounded-lg tracking-widest">
+                        Smstr {m.semester}
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-base md:text-lg font-black leading-snug text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    {m.judul}
+                  </h2>
                 </div>
-                <h2 className="text-2xl font-black mt-6 mb-4 uppercase leading-[1.1] text-gray-800 tracking-tighter group-hover:text-black transition-colors">
-                  {m.judul}
-                </h2>
-              </div>
 
-              {/* Action Button Timbul */}
-              <div className="mt-10">
-                <a
-                  href={m.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full text-center py-5 bg-[#800020] text-white rounded-[20px] font-black text-[11px] tracking-[0.2em] uppercase shadow-[5px_10px_20px_rgba(128,0,32,0.2)] hover:shadow-[5px_15px_30px_rgba(128,0,32,0.4)] hover:bg-black transition-all active:scale-95"
-                >
-                  Lihat Materi
-                </a>
+                {/* Action Button */}
+                <div className="mt-6">
+                  <a
+                    href={m.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-center py-3.5 bg-indigo-600 text-white rounded-2xl font-black text-[10px] tracking-[0.2em] uppercase shadow-md hover:bg-indigo-700 active:scale-95 transition-all"
+                  >
+                    Lihat Materi
+                  </a>
+                </div>
               </div>
-            </div>
-          </InteractiveCard>
-        ))}
-      </div>
-
-      {filteredMateri.length === 0 && (
-        <div className="text-center py-20 text-gray-400 font-black uppercase tracking-widest opacity-50">
-          Kosong / Tidak ditemukan
+            </InteractiveCard>
+          ))}
         </div>
-      )}
+
+        {filteredMateri.length === 0 && (
+          <div className="py-20 text-center">
+            <PackageOpen className="mx-auto text-slate-300 mb-3" size={48} />
+            <p className="text-slate-300 dark:text-slate-600 font-black uppercase italic text-xl tracking-widest">Kosong</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

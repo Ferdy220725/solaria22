@@ -55,61 +55,76 @@ export default function Login() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-sm text-gray-500">Memuat...</p>
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f7fb] dark:bg-[#0a0a0a]">
+        <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
-      <form onSubmit={handleLogin} className="bg-white p-8 rounded-[30px] shadow-xl max-w-md w-full space-y-4 border border-slate-200">
-        <h2 className="text-2xl font-black text-center uppercase tracking-tighter text-[#800020]">Login Sobat Agrotek</h2>
+    <div className="min-h-screen flex items-center justify-center bg-[#f7f7fb] dark:bg-[#0a0a0a] p-6">
+      <form
+        onSubmit={handleLogin}
+        className="bg-white dark:bg-[#141414] p-8 rounded-[30px] shadow-sm max-w-md w-full space-y-4 border border-slate-100 dark:border-white/10"
+      >
+        {/* Header ala hero card dashboard: gradient indigo-purple, rounded besar */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-purple-600 rounded-[22px] p-6 mb-2 text-center text-white">
+          <p className="text-2xl relative z-10">👋</p>
+          <h2 className="text-xl font-black uppercase tracking-tight mt-1 relative z-10">
+            Login Sobat Agrotek
+          </h2>
+          <p className="text-xs text-indigo-100 mt-1 relative z-10">Semangat menjalani hari ini...</p>
+          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+        </div>
 
         <div>
-          <label className="block text-xs font-black uppercase text-slate-500 mb-1">Nama Lengkap (Sesuai SIAKAD)</label>
+          <label className="block text-xs font-black uppercase text-slate-400 mb-1">
+            Nama Lengkap (Sesuai SIAKAD)
+          </label>
           <input
             type="text"
             value={namaLengkap}
             onChange={(e) => setNamaLengkap(e.target.value)}
             placeholder="Contoh: Ahmat Choyrul Ferdyansyah"
-            className="w-full p-3 rounded-xl border-2 border-slate-200 text-sm font-medium focus:border-[#800020] outline-none"
+            className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border-2 border-slate-100 dark:border-white/10 text-sm font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 outline-none"
             required
           />
         </div>
 
         <div>
-          <label className="block text-xs font-black uppercase text-slate-500 mb-1">NPM / Nomor Pokok Mahasiswa</label>
+          <label className="block text-xs font-black uppercase text-slate-400 mb-1">
+            NPM / Nomor Pokok Mahasiswa
+          </label>
           <input
             type="text"
             value={npm}
             onChange={(e) => setNpm(e.target.value)}
             placeholder="Contoh: 25025010..."
-            className="w-full p-3 rounded-xl border-2 border-slate-200 text-sm font-mono focus:border-[#800020] outline-none"
+            className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border-2 border-slate-100 dark:border-white/10 text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 outline-none"
             required
           />
         </div>
 
         <div>
-          <label className="block text-xs font-black uppercase text-slate-500 mb-1">Email</label>
+          <label className="block text-xs font-black uppercase text-slate-400 mb-1">Email</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="username@email.com"
-            className="w-full p-3 rounded-xl border-2 border-slate-200 text-sm focus:border-[#800020] outline-none"
+            className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border-2 border-slate-100 dark:border-white/10 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 outline-none"
             required
           />
         </div>
 
         <div>
-          <label className="block text-xs font-black uppercase text-slate-500 mb-1">Password</label>
+          <label className="block text-xs font-black uppercase text-slate-400 mb-1">Password</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full p-3 rounded-xl border-2 border-slate-200 text-sm focus:border-[#800020] outline-none"
+            className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border-2 border-slate-100 dark:border-white/10 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 outline-none"
             required
           />
         </div>
@@ -117,12 +132,15 @@ export default function Login() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-[#800020] text-white py-3 rounded-xl font-black uppercase tracking-wider text-sm border-b-4 border-[#5a0016] active:scale-95 transition-all disabled:opacity-50"
+          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-black uppercase tracking-wider text-sm shadow-md active:scale-95 transition-all disabled:opacity-50"
         >
           {loading ? "Memproses..." : "Masuk Sistem 🚀"}
         </button>
 
-        <Link href="/lupa-password" className="block text-center text-xs text-slate-400 hover:text-[#800020]">
+        <Link
+          href="/lupa-password"
+          className="block text-center text-xs text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+        >
           Lupa kata sandi?
         </Link>
       </form>

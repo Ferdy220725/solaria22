@@ -1,4 +1,3 @@
-// lib/wallpaper/templates.ts
 import { ComponentType, RefAttributes } from "react";
 import { JadwalWallpaperData } from "./types";
 import PastelSoftTemplate from "@/components/wallpaper/PastelSoftTemplate";
@@ -8,6 +7,9 @@ import AuroraDarkTemplate from "@/components/wallpaper/AuroraDarkTemplate";
 
 export interface TemplateProps {
   data: JadwalWallpaperData;
+  width?: number;
+  height?: number;
+  sizeId?: string;
 }
 
 export interface TemplateDef {

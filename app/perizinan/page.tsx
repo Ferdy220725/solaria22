@@ -260,19 +260,19 @@ const SuratIzinMahasiswa = () => {
   };
 
   return (
-    <div className="p-4 md:p-10 bg-slate-100 min-h-screen text-slate-900 font-sans">
+    <div className="p-4 md:p-10 bg-[#f7f7fb] dark:bg-[#0a0a0a] min-h-screen text-slate-900 dark:text-white font-sans">
       {/* ── MODAL WAJIB: muncul begitu perizinan sukses terkirim ── */}
       {showKirimPanel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="bg-white max-w-md w-full rounded-[30px] p-6 md:p-8 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in duration-200">
-            <div className="w-14 h-14 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto text-2xl font-black">
+          <div className="bg-white dark:bg-[#141414] max-w-md w-full rounded-[30px] p-6 md:p-8 shadow-2xl border border-slate-100 dark:border-white/10 text-center space-y-4 animate-in fade-in zoom-in duration-200">
+            <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto text-2xl font-black">
               ✓
             </div>
             <div>
-              <p className="text-sm font-black text-slate-800 uppercase">Data Berhasil Terkirim!</p>
-              <p className="text-xs font-black text-[#800020] uppercase mt-1">Satu Langkah Lagi ⚠️</p>
+              <p className="text-sm font-black text-slate-800 dark:text-white uppercase">Data Berhasil Terkirim!</p>
+              <p className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase mt-1">Satu Langkah Lagi ⚠️</p>
             </div>
-            <p className="text-[12px] text-slate-500 leading-relaxed">
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-relaxed">
               Surat PDF kamu sudah siap dan sudah punya link. <b>Wajib dikirim ke Admin lewat WhatsApp</b> di
               bawah ini supaya perizinanmu langsung diproses — laporan tidak dianggap masuk kalau surat belum
               dikirim.
@@ -281,25 +281,25 @@ const SuratIzinMahasiswa = () => {
             <div className="flex flex-col gap-3 pt-2">
               <button
                 onClick={() => handlePilihAksi("wa")}
-                className="w-full bg-green-600 text-white px-5 py-4 rounded-xl font-black text-xs shadow-md hover:bg-green-700"
+                className="w-full bg-emerald-600 text-white px-5 py-4 rounded-xl font-black text-xs shadow-md hover:bg-emerald-700 transition-all active:scale-95"
               >
                 📩 Kirim ke WA Admin Sekarang
               </button>
               <button
                 onClick={() => handlePilihAksi("grup")}
-                className="w-full bg-emerald-700 text-white px-5 py-4 rounded-xl font-black text-xs shadow-md hover:bg-emerald-800"
+                className="w-full bg-emerald-700 text-white px-5 py-4 rounded-xl font-black text-xs shadow-md hover:bg-emerald-800 transition-all active:scale-95"
               >
                 👥 Kirim ke Grup WA Kelas
               </button>
               <button
                 onClick={() => handlePilihAksi("lihat")}
-                className="w-full bg-slate-100 text-slate-600 px-5 py-3 rounded-xl font-black text-[10px] shadow-sm hover:bg-slate-200"
+                className="w-full bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 px-5 py-3 rounded-xl font-black text-[10px] shadow-sm hover:bg-slate-200 dark:hover:bg-white/10 transition-all active:scale-95"
               >
                 🔗 Lihat/Buka Link PDF Saja
               </button>
             </div>
 
-            <p className="text-[9px] text-slate-400 leading-relaxed">
+            <p className="text-[9px] text-slate-400 dark:text-slate-500 leading-relaxed">
               Pesan WA sudah otomatis terisi lengkap dengan link surat PDF-nya. Untuk "Kirim ke WA Admin",
               chat langsung terbuka tinggal pencet kirim. Untuk "Kirim ke Grup", WhatsApp akan membuka daftar
               chat kamu — tinggal pilih grup kelasnya, pesan sudah siap, lalu kirim. Admin akan buka link
@@ -318,69 +318,118 @@ const SuratIzinMahasiswa = () => {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto bg-white p-6 md:p-10 rounded-[30px] shadow-xl border border-slate-200">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-black text-[#800020] uppercase tracking-tight">Form Perizinan Kuliah</h1>
-          <p className="text-xs font-bold text-slate-400 mt-1">Lengkapi data untuk dikonfirmasi oleh Admin</p>
+      <div className="max-w-2xl mx-auto bg-white dark:bg-[#141414] p-6 md:p-10 rounded-[30px] shadow-sm border border-slate-100 dark:border-white/10">
+        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-purple-600 rounded-[22px] p-6 mb-8 text-center text-white">
+          <h1 className="text-2xl font-black uppercase tracking-tight relative z-10">Form Perizinan Kuliah</h1>
+          <p className="text-xs font-bold text-indigo-100 mt-1 relative z-10">Lengkapi data untuk dikonfirmasi oleh Admin</p>
+          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
         </div>
 
         <div className="space-y-5">
           {/* Baris 1: Nama & NPM */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase ml-1">Nama Mahasiswa</label>
-              <input name="namaLengkap" placeholder="Contoh: Budi Santoso" className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.namaLengkap} />
+              <label className="text-[10px] font-black uppercase ml-1 text-slate-400">Nama Mahasiswa</label>
+              <input
+                name="namaLengkap"
+                placeholder="Contoh: Budi Santoso"
+                className="w-full border-2 border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 p-3 rounded-2xl focus:border-indigo-500 outline-none transition-all"
+                onChange={handleInputChange}
+                value={formData.namaLengkap}
+              />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase ml-1">NPM</label>
-              <input name="npm" placeholder="Masukkan NPM" className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.npm} />
+              <label className="text-[10px] font-black uppercase ml-1 text-slate-400">NPM</label>
+              <input
+                name="npm"
+                placeholder="Masukkan NPM"
+                className="w-full border-2 border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 p-3 rounded-2xl focus:border-indigo-500 outline-none transition-all"
+                onChange={handleInputChange}
+                value={formData.npm}
+              />
             </div>
           </div>
 
           {/* Baris 2: Matkul & Wali */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase ml-1">Mata Kuliah</label>
-              <input name="namaMatkul" placeholder="Nama MK" className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.namaMatkul} />
+              <label className="text-[10px] font-black uppercase ml-1 text-slate-400">Mata Kuliah</label>
+              <input
+                name="namaMatkul"
+                placeholder="Nama MK"
+                className="w-full border-2 border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 p-3 rounded-2xl focus:border-indigo-500 outline-none transition-all"
+                onChange={handleInputChange}
+                value={formData.namaMatkul}
+              />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase ml-1">Nama Orang Tua/Wali</label>
-              <input name="namaWali" placeholder="Nama Pendamping" className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.namaWali} />
+              <label className="text-[10px] font-black uppercase ml-1 text-slate-400">Nama Orang Tua/Wali</label>
+              <input
+                name="namaWali"
+                placeholder="Nama Pendamping"
+                className="w-full border-2 border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 p-3 rounded-2xl focus:border-indigo-500 outline-none transition-all"
+                onChange={handleInputChange}
+                value={formData.namaWali}
+              />
             </div>
           </div>
 
           {/* Baris 3: Tanggal & Upload */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase ml-1">Tanggal Izin</label>
-              <input name="tanggal" type="date" className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.tanggal} />
+              <label className="text-[10px] font-black uppercase ml-1 text-slate-400">Tanggal Izin</label>
+              <input
+                name="tanggal"
+                type="date"
+                className="w-full border-2 border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white p-3 rounded-2xl focus:border-indigo-500 outline-none transition-all [color-scheme:light] dark:[color-scheme:dark]"
+                onChange={handleInputChange}
+                value={formData.tanggal}
+              />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase ml-1">Lampiran Bukti (Foto)</label>
-              <input type="file" accept="image/*" className="w-full border-2 p-2 rounded-2xl text-xs bg-slate-50" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              <label className="text-[10px] font-black uppercase ml-1 text-slate-400">Lampiran Bukti (Foto)</label>
+              <input
+                type="file"
+                accept="image/*"
+                className="w-full border-2 border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white p-2 rounded-2xl text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:text-white file:text-xs file:font-bold"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase ml-1">Alasan Tidak Mengikuti Kuliah</label>
-            <textarea name="alasan" rows={3} placeholder="Contoh: Sakit demam/Acara keluarga..." className="w-full border-2 p-3 rounded-2xl focus:border-[#800020] outline-none transition-all" onChange={handleInputChange} value={formData.alasan} />
+            <label className="text-[10px] font-black uppercase ml-1 text-slate-400">Alasan Tidak Mengikuti Kuliah</label>
+            <textarea
+              name="alasan"
+              rows={3}
+              placeholder="Contoh: Sakit demam/Acara keluarga..."
+              className="w-full border-2 border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 p-3 rounded-2xl focus:border-indigo-500 outline-none transition-all"
+              onChange={handleInputChange}
+              value={formData.alasan}
+            />
           </div>
 
           {/* AREA TANDA TANGAN (Sangat Penting untuk HP) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-blue-600 flex justify-between">
-                Tanda Tangan Wali <button onClick={() => clearSignature('ortu')} className="text-red-500 lowercase font-normal italic">[hapus]</button>
+              <label className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 flex justify-between">
+                Tanda Tangan Wali{" "}
+                <button onClick={() => clearSignature('ortu')} className="text-red-500 lowercase font-normal italic">
+                  [hapus]
+                </button>
               </label>
-              <div className="border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50 overflow-hidden touch-none">
+              <div className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-white/5 overflow-hidden touch-none">
                 <SignatureCanvas ref={sigPadOrtu} penColor="black" canvasProps={{ className: "w-full h-32" }} />
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-blue-600 flex justify-between">
-                Tanda Tangan Mahasiswa <button onClick={() => clearSignature('mhs')} className="text-red-500 lowercase font-normal italic">[hapus]</button>
+              <label className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 flex justify-between">
+                Tanda Tangan Mahasiswa{" "}
+                <button onClick={() => clearSignature('mhs')} className="text-red-500 lowercase font-normal italic">
+                  [hapus]
+                </button>
               </label>
-              <div className="border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50 overflow-hidden touch-none">
+              <div className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-white/5 overflow-hidden touch-none">
                 <SignatureCanvas ref={sigPadMhs} penColor="black" canvasProps={{ className: "w-full h-32" }} />
               </div>
             </div>
@@ -390,7 +439,11 @@ const SuratIzinMahasiswa = () => {
         <button
           onClick={handleSubmit}
           disabled={loading}
-          className={`w-full mt-10 py-5 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-[#800020] text-white hover:bg-black'}`}
+          className={`w-full mt-10 py-5 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
+            loading
+              ? 'bg-slate-300 dark:bg-white/10 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+              : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90'
+          }`}
         >
           {loading ? "Sedang Mengirim..." : "Kirim Perizinan"}
         </button>

@@ -1,11 +1,12 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { createClient } from '../../utils/supabase/client';
+import { createClient } from '@/utils/supabase/client';
+import { Lock, CheckCircle2, ClipboardCheck, XCircle, Loader2 } from 'lucide-react';
 
 // Daftar Mahasiswa tetap dipertahankan sesuai aslinya
 const DAFTAR_MAHASISWA = [
   { npm: "25025010093", nama: "SITI NUR FADILAH" },
-  { npm: "25025010094", nama: "AGNIA LAQUINTA A-ABIN" },
+  { npm: "25025010094", nama: "AGNIA LAQUINTA AL-ABIN" },
   { npm: "25025010095", nama: "AFIA DWI AGUSTIN" },
   { npm: "25025010096", nama: "APRILITA MASYFATAH" },
   { npm: "25025010097", nama: "SYAKILA BALQIS AL-FANEZA" },
@@ -64,7 +65,7 @@ export default function AbsensiMahasiswa() {
   const [inputKode, setInputKode] = useState('');
   const [isVerified, setIsVerified] = useState(false);
   const [kodeBenarDariDB, setKodeBenarDariDB] = useState('');
-  
+
   const supabase = createClient();
 
   useEffect(() => {
@@ -77,7 +78,7 @@ export default function AbsensiMahasiswa() {
       .select('is_active, kode_akses')
       .eq('id', 'absensi')
       .maybeSingle();
-    
+
     setIsOpen(data?.is_active || false);
     setKodeBenarDariDB(data?.kode_akses || '');
     setLoading(false);
@@ -93,7 +94,7 @@ export default function AbsensiMahasiswa() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     let finalNama = "";
     let finalNpm = "";
 
@@ -108,12 +109,12 @@ export default function AbsensiMahasiswa() {
     } else {
       return alert("Silakan pilih nama Anda!");
     }
-    
+
     setIsSubmitting(true);
 
     try {
       const now = new Date();
-      const wibOffset = 7 * 60 * 60 ;
+      const wibOffset = 7 * 60 * 60;
       const wibTime = new Date(now.getTime() + wibOffset);
       const today = wibTime.toISOString().split('T')[0];
 
@@ -143,7 +144,7 @@ export default function AbsensiMahasiswa() {
 
       localStorage.setItem('nama_user_solaria', finalNama);
       setIsSuccess(true);
-      
+
     } catch (err: any) {
       alert("Sistem Error: " + err.message);
     } finally {
@@ -151,53 +152,61 @@ export default function AbsensiMahasiswa() {
     }
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center font-bold text-slate-400 uppercase tracking-widest">LOADING...</div>;
+  if (loading) return (
+    <div className="flex h-screen items-center justify-center bg-[#f7f7fb] dark:bg-[#0a0a0a]">
+      <Loader2 className="animate-spin text-indigo-600" size={28} />
+    </div>
+  );
 
   if (!isOpen) return (
-    <div className="flex h-screen items-center justify-center bg-slate-50 p-6 text-slate-900">
-      <div className="text-center bg-white p-10 rounded-[40px] shadow-xl border-t-[10px] border-red-600 max-w-md w-full">
-        <h1 className="text-3xl font-black text-red-600 mb-4 uppercase">ABSEN CLOSED</h1>
-        <p className="font-bold text-slate-500 uppercase text-xs">Sistem sedang ditutup oleh Admin.</p>
+    <div className="flex h-screen items-center justify-center bg-[#f7f7fb] dark:bg-[#0a0a0a] p-6">
+      <div className="text-center bg-white dark:bg-[#141414] p-10 rounded-[32px] shadow-sm border border-slate-100 dark:border-white/10 max-w-md w-full">
+        <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-500/10 flex items-center justify-center mx-auto mb-5">
+          <XCircle className="text-red-600" size={28} />
+        </div>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Absen Ditutup</h1>
+        <p className="text-sm font-medium text-slate-400">Sistem sedang ditutup oleh Admin.</p>
       </div>
     </div>
   );
 
   if (isSuccess) return (
-    <div className="flex h-screen items-center justify-center bg-green-50 p-6 text-slate-900">
-      <div className="text-center bg-white p-10 rounded-[40px] shadow-2xl border-t-[10px] border-green-600 max-w-md w-full">
-        <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-           <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+    <div className="flex h-screen items-center justify-center bg-[#f7f7fb] dark:bg-[#0a0a0a] p-6">
+      <div className="text-center bg-white dark:bg-[#141414] p-10 rounded-[32px] shadow-sm border border-slate-100 dark:border-white/10 max-w-md w-full">
+        <div className="bg-emerald-50 dark:bg-emerald-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle2 className="text-emerald-600" size={36} />
         </div>
-        <h1 className="text-2xl font-black text-green-700 uppercase mb-2">Berhasil!</h1>
-        <p className="font-bold text-slate-600 uppercase text-[12px]">Presensi Anda sudah direkam</p>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Berhasil!</h1>
+        <p className="text-sm font-medium text-slate-400">Presensi kamu sudah direkam</p>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-slate-900">
-      
+    <div className="min-h-screen bg-[#f7f7fb] dark:bg-[#0a0a0a] flex flex-col items-center justify-center p-6">
+
       {/* TAMPILAN 1: INPUT KODE (GERBANG AWAL) */}
       {!isVerified ? (
-        <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden border-t-[10px] border-[#800020] p-10 animate-in fade-in zoom-in duration-500">
-           <div className="text-center mb-8">
-            <div className="text-4xl mb-4">🔐</div>
-            <h1 className="text-2xl font-black text-[#800020] uppercase tracking-tighter">Masukkan Kode</h1>
-            <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Minta kode akses ke dosen atau admin</p>
+        <div className="w-full max-w-md bg-white dark:bg-[#141414] rounded-[32px] shadow-sm border border-slate-100 dark:border-white/10 p-8 md:p-10 animate-in fade-in zoom-in duration-500">
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-600/30">
+              <Lock className="text-white" size={22} />
+            </div>
+            <h1 className="text-xl font-black text-slate-900 dark:text-white">Masukkan Kode Akses</h1>
+            <p className="text-xs text-slate-400 font-medium mt-1">Minta kode akses ke dosen atau admin</p>
           </div>
 
-          <div className="space-y-4">
-            <input 
-              type="text" 
+          <div className="space-y-3">
+            <input
+              type="text"
               placeholder="KODE DISINI"
               value={inputKode}
               onChange={(e) => setInputKode(e.target.value)}
-              // FIX: text-slate-900 memastikan teks input tetap hitam
-              className="w-full p-5 bg-slate-50 border-2 border-slate-100 focus:border-[#800020] rounded-2xl outline-none font-black text-center uppercase tracking-widest transition-all text-slate-900"
+              className="w-full p-4 bg-slate-50 dark:bg-white/5 border-2 border-slate-100 dark:border-white/10 focus:border-indigo-500 rounded-2xl outline-none font-black text-center uppercase tracking-widest transition-all text-slate-900 dark:text-white"
             />
-            <button 
+            <button
               onClick={handleVerifikasiKode}
-              className="w-full py-5 rounded-2xl bg-[#800020] text-white font-black uppercase shadow-lg hover:bg-black active:scale-95 transition-all"
+              className="w-full py-4 rounded-2xl bg-indigo-600 text-white font-black shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 active:scale-95 transition-all"
             >
               Verifikasi & Buka Form →
             </button>
@@ -205,64 +214,72 @@ export default function AbsensiMahasiswa() {
         </div>
       ) : (
         /* TAMPILAN 2: FORMULIR ABSENSI ASLI (MUNCUL SETELAH KODE BENAR) */
-        <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden border-t-[10px] border-[#800020] animate-in slide-in-from-bottom-10 duration-500">
-          <div className="p-10">
+        <div className="w-full max-w-md bg-white dark:bg-[#141414] rounded-[32px] shadow-sm border border-slate-100 dark:border-white/10 animate-in slide-in-from-bottom-10 duration-500">
+          <div className="p-8 md:p-10">
             <div className="mb-8 text-center">
-              <h1 className="text-2xl font-black text-[#800020] uppercase">Absensi Mahasiswa</h1>
-              <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Status: Terverifikasi ✅</p>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-600/30">
+                <ClipboardCheck className="text-white" size={22} />
+              </div>
+              <h1 className="text-xl font-black text-slate-900 dark:text-white">Absensi Mahasiswa</h1>
+              <p className="text-xs font-bold text-emerald-600 mt-1">✓ Terverifikasi</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2">Cari Nama</label>
-                <select 
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-wider">Cari Nama</label>
+                {/*
+                  PENTING: <option> di dalam <select> dirender pakai popup native
+                  browser, background-nya HAMPIR SELALU PUTIH walau web-nya dark mode
+                  (ini kontrol OS/browser, bukan CSS kita). Makanya <option> di bawah
+                  sengaja dikasih warna teks gelap TETAP (gak pakai dark: variant),
+                  biar teksnya selalu kebaca di atas background putih itu, baik pas
+                  web mode terang maupun dark.
+                */}
+                <select
                   value={selectedStudent}
                   onChange={(e) => setSelectedStudent(e.target.value)}
-                  // FIX: text-slate-900 memastikan nama mahasiswa tetap hitam
-                  className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-[#800020] rounded-2xl outline-none font-bold appearance-none cursor-pointer transition-all text-slate-900"
+                  className="w-full p-4 bg-slate-50 dark:bg-white/5 border-2 border-transparent focus:border-indigo-500 rounded-2xl outline-none font-bold appearance-none cursor-pointer transition-all text-slate-900 dark:text-white"
                 >
-                  <option value="">-- KLIK UNTUK MEMILIH NAMA --</option>
+                  <option value="" className="text-slate-900 bg-white">-- Klik untuk memilih nama --</option>
                   {DAFTAR_MAHASISWA.map((m) => (
-                    <option key={m.npm} value={m.npm}>{m.nama}</option>
+                    <option key={m.npm} value={m.npm} className="text-slate-900 bg-white">{m.nama}</option>
                   ))}
-                  <option value="LAINNYA">--- SAYA TIDAK ADA DI DAFTAR (LAINNYA) ---</option>
+                  <option value="LAINNYA" className="text-slate-900 bg-white">--- Saya tidak ada di daftar (Lainnya) ---</option>
                 </select>
               </div>
 
               {selectedStudent === "LAINNYA" && (
-                <div className="space-y-4 animate-in fade-in duration-500">
-                  <input 
-                    type="text" 
+                <div className="space-y-3 animate-in fade-in duration-500">
+                  <input
+                    type="text"
                     placeholder="MASUKKAN NAMA LENGKAP"
-                    // FIX: text-slate-900
-                    className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold uppercase text-slate-900"
+                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border-2 border-indigo-100 dark:border-indigo-500/20 focus:border-indigo-500 rounded-2xl outline-none font-bold uppercase text-slate-900 dark:text-white"
                     value={namaManual}
                     onChange={(e) => setNamaManual(e.target.value)}
                   />
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     placeholder="MASUKKAN NPM"
-                    // FIX: text-slate-900
-                    className="w-full p-4 bg-slate-50 border-2 border-[#800020]/20 focus:border-[#800020] rounded-2xl outline-none font-bold text-slate-900"
+                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border-2 border-indigo-100 dark:border-indigo-500/20 focus:border-indigo-500 rounded-2xl outline-none font-bold text-slate-900 dark:text-white"
                     value={npmManual}
                     onChange={(e) => setNpmManual(e.target.value)}
                   />
                 </div>
               )}
 
-              <button 
+              <button
                 disabled={isSubmitting}
-                type="submit" 
-                className={`w-full py-5 rounded-2xl font-black text-white uppercase shadow-lg transition-all ${isSubmitting ? 'bg-slate-400' : 'bg-[#800020] hover:bg-black active:scale-95'}`}
+                type="submit"
+                className={`w-full py-4 rounded-2xl font-black text-white shadow-lg transition-all ${isSubmitting ? 'bg-slate-400' : 'bg-indigo-600 shadow-indigo-600/30 hover:bg-indigo-700 active:scale-95'}`}
               >
-                {isSubmitting ? 'MEMPROSES...' : 'KIRIM ABSENSI'}
+                {isSubmitting ? 'Memproses...' : 'Kirim Absensi'}
               </button>
             </form>
           </div>
         </div>
       )}
-      
-      <p className="mt-6 text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Satu NPM hanya diperbolehkan satu kali absen per hari</p>
+
+      <p className="mt-6 text-[10px] font-bold text-slate-400 text-center tracking-wide">Satu NPM hanya diperbolehkan satu kali absen per hari</p>
     </div>
   );
 }

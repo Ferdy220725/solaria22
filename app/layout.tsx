@@ -15,7 +15,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// --- METADATA TERBARU: REBRANDING KE ZORA ---
 export const metadata: Metadata = {
   title: "Zora - Manajemen Agroteknologi C",
   description: "Zora: Pusat informasi dan manajemen akademik mahasiswa Agroteknologi C. Dimana Bumi dan Ilmu Pengetahuan Bersatu.",
@@ -25,7 +24,6 @@ export const metadata: Metadata = {
   },
 };
 
-// --- BARU: viewport terpisah, wajib untuk safe-area-inset di HP ---
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -43,11 +41,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased transition-colors duration-700 bg-white dark:bg-[#0a0a0a] text-slate-900 dark:text-white`}
       >
-        {/* Komponen Inti Zora System */}
         <ThemeEngine />
         <Navbar />
 
-        <main className="relative z-10">
+        <main className="relative z-10 md:pl-64 pt-16 md:pt-0 pb-[68px] md:pb-0">
           {children}
         </main>
 

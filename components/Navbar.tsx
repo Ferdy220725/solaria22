@@ -18,7 +18,7 @@ import {
   ClipboardList,
   Settings,
   HelpCircle,
-  Sprout,
+  GraduationCap,
   Menu,
   X,
   Bell,
@@ -48,6 +48,13 @@ const mainNavItems: NavItem[] = [
   { id: "zora-ai", name: "Zora AI", href: "/zora-ai", icon: <Sparkles size={20} />, comingSoon: true },
   { id: "pengumuman", name: "Pengumuman", href: "/pengumuman", icon: <Megaphone size={20} /> },
   { id: "laporan", name: "Laporan", href: "/laporan", icon: <ClipboardList size={20} />, comingSoon: true },
+  {
+    id: "khs",
+    name: "KHS",
+    href: "https://registrasi.upnjatim.ac.id/lp3m/html/lp3m/loginKHS.asp",
+    icon: <GraduationCap size={20} />,
+    external: true,
+  },
 ];
 
 const footerNavItems: NavItem[] = [
@@ -55,9 +62,9 @@ const footerNavItems: NavItem[] = [
   { id: "bantuan", name: "Bantuan & Tentang", href: "/tentang", icon: <HelpCircle size={20} /> },
   {
     id: "eksternal",
-    name: "Pertanian Perkotaan",
-    href: "https://pertanian-perkotaan-c.vercel.app/",
-    icon: <Sprout size={20} />,
+    name: "SIAMIK",
+    href: "https://siamik.upnjatim.ac.id/html/siamik/index.asp",
+    icon: <GraduationCap size={20} />,
     external: true,
   },
 ];

@@ -57,7 +57,7 @@ export default function TentangPage() {
               Kenalan Sama <br className="hidden md:block" /> Zora Yuk!
             </h1>
             <p className="text-indigo-100 text-xs md:text-sm font-medium max-w-xl mx-auto leading-relaxed">
-              Portal digital yang dibangun khusus untuk mendukung kegiatan perkuliahan Kelas C Agroteknologi.
+              Platform manajemen kelas digital yang dirancang untuk mendukung kegiatan perkuliahan di berbagai kelas dan program studi.
             </p>
           </div>
 
@@ -76,11 +76,15 @@ export default function TentangPage() {
             </h2>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-            <span className="font-black text-indigo-600">Zora</span> adalah nama sekaligus sebutan untuk asisten
-            digital Kelas C Agroteknologi — sebuah sistem manajemen kelas yang membantu mengelola kegiatan
-            perkuliahan sehari-hari. Mulai dari memantau tugas dan deadline, jadwal kuliah, sesi Zoom, materi
-            kuliah, praktikum, sampai pengajuan izin, semuanya dirangkum dalam satu platform yang simpel dan bisa
-            diakses kapan saja.
+            <span className="font-black text-indigo-600">Zora</span> adalah sistem manajemen kelas digital yang
+            membantu mengelola kegiatan perkuliahan sehari-hari. Mulai dari memantau tugas dan deadline, jadwal
+            kuliah, sesi Zoom, materi kuliah, praktikum, sampai pengajuan izin, semuanya dirangkum dalam satu
+            platform yang simpel dan bisa diakses kapan saja.
+          </p>
+          <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium mt-4">
+            Setiap kelas yang menggunakan Zora memiliki ruangnya sendiri — data dan aktivitas satu kelas tidak
+            akan tercampur dengan kelas lain, sehingga Zora bisa dipakai oleh satu kelas maupun banyak kelas
+            sekaligus tanpa mengorbankan privasi masing-masing.
           </p>
           <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium mt-4">
             Tujuannya sederhana: supaya informasi perkuliahan nggak lagi tercecer di berbagai grup chat, dan setiap
@@ -134,7 +138,7 @@ export default function TentangPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
               { icon: <Target size={20} />, title: "Fokus & Terorganisir", desc: "Semua tugas, deadline, dan jadwal tersusun rapi di satu dashboard." },
-              { icon: <Users size={20} />, title: "Dibuat oleh & untuk Kelas C", desc: "Dikembangkan langsung berdasarkan kebutuhan nyata teman-teman sekelas." },
+              { icon: <Users size={20} />, title: "Fleksibel untuk Semua Kelas", desc: "Setiap kelas punya ruang data sendiri, sehingga Zora bisa dipakai oleh satu kelas maupun banyak kelas sekaligus." },
               { icon: <Sparkles size={20} />, title: "Terus Diperbarui", desc: "Fitur terus dikembangkan dari masukan dan saran pengguna." },
             ].map((f) => (
               <div key={f.title} className="bg-white dark:bg-[#141414] p-6 rounded-[24px] shadow-sm border border-slate-100 dark:border-white/10 text-center">
@@ -206,7 +210,7 @@ export default function TentangPage() {
 
         {/* CREDIT PEMBUAT */}
         <p className="flex items-center justify-center gap-1.5 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 pt-2 pb-4">
-          Web by Ahmat Choyrul Ferdyansyah <Heart size={11} className="text-indigo-400 fill-indigo-400" />
+          Web by Ahmat Choyrul Ferdyansyah 
         </p>
       </div>
     </div>

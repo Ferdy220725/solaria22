@@ -1,17 +1,34 @@
 "use server";
 
-/**
- * Mengirim pesan ke grup/channel Telegram menggunakan Bot API.
- * Wajib dipanggil dari server (server action / route handler),
- * karena menggunakan TELEGRAM_BOT_TOKEN yang bersifat rahasia.
- */
-export async function sendTelegramNotification(message: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+import { createClient } from "@supabase/supabase-js";
 
-  if (!token || !chatId) {
-    console.error("[Telegram] TELEGRAM_BOT_TOKEN atau TELEGRAM_CHAT_ID belum diset di env.");
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // pakai service role, bukan anon key
+);
+
+/**
+ * Mengirim pesan ke grup Telegram kelas tertentu, berdasarkan kelas_id.
+ * Wajib dipanggil dari server (server action / route handler).
+ */
+export async function sendTelegramNotification(kelasId: string, message: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+
+  if (!token) {
+    console.error("[Telegram] TELEGRAM_BOT_TOKEN belum diset di env.");
     return { ok: false, error: "Konfigurasi Telegram tidak lengkap" };
+  }
+
+  // Ambil chat_id sesuai kelas
+  const { data: kelas, error: kelasError } = await supabase
+    .from("kelas")
+    .select("telegram_chat_id, nama")
+    .eq("id", kelasId)
+    .single();
+
+  if (kelasError || !kelas?.telegram_chat_id) {
+    console.error("[Telegram] Kelas belum punya telegram_chat_id:", kelasId, kelasError);
+    return { ok: false, error: "Kelas ini belum terhubung ke grup Telegram" };
   }
 
   try {
@@ -19,7 +36,7 @@ export async function sendTelegramNotification(message: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: chatId,
+        chat_id: kelas.telegram_chat_id,
         text: message,
         parse_mode: "HTML",
         disable_web_page_preview: true,

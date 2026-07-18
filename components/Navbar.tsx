@@ -75,7 +75,7 @@ const mobileTabItems: NavItem[] = [
   { id: "kalender", name: "Kalender", href: "/jadwal-sistem/list", icon: <CalendarDays size={22} /> },
   { id: "zora-ai", name: "Zora AI", href: "/zora-ai", icon: <Sparkles size={24} />, comingSoon: true },
   { id: "notifikasi", name: "Notifikasi", href: "/notifikasi", icon: <Bell size={22} />, comingSoon: true },
-  { id: "profil", name: "Profil", href: "/akun", icon: <User size={22} />, comingSoon: true },
+  { id: "profil", name: "Profil", href: "/akun-saya", icon: <User size={22} /> },
 ];
 
 export default function Navbar() {

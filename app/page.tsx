@@ -50,7 +50,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 font-medium mb-8 leading-relaxed">
-            Zora adalah sistem manajemen Kelas C Agroteknologi — pantau tugas, deadline,
+            Sistem Manajemen Kelas  — pantau tugas, deadline,
             absensi, dan jadwal Zoom kelas dalam satu tempat.
           </p>
 

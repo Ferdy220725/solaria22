@@ -4,10 +4,20 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '../../utils/supabase/client';
 import { jsPDF } from "jspdf";
 import { sendTelegramNotification } from '../actions/telegram';
+import Link from 'next/link';
 
 export default function SuperAdminPage() {
-  const [role, setRole] = useState<'GUEST' | 'WEB' | 'ABSEN'>('GUEST');
-  const [password, setPassword] = useState('');
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [adminProfile, setAdminProfile] = useState<{ id: string; nama: string; kelas_id: string; kelas_nama: string; role: string } | null>(null);
+  const [pendingList, setPendingList] = useState<any[]>([]);
+  const [adminList, setAdminList] = useState<any[]>([]);
+  const [ownerLoading, setOwnerLoading] = useState(false);
+  const [view, setView] = useState<'WEB' | 'ABSEN'>('WEB');
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+
   const supabase = createClient();
 
   // --- STATE DATA ---
@@ -18,21 +28,20 @@ export default function SuperAdminPage() {
   const [absensiEnabled, setAbsensiEnabled] = useState(false);
   const [kodeAbsen, setKodeAbsen] = useState('');
 
-  // --- STATE DATA VERIFIKASI MAHASISWA (FITUR TERBARU) ---
+  // --- STATE DATA VERIFIKASI MAHASISWA ---
   const [profiles, setProfiles] = useState<any[]>([]);
 
-  // --- STATE BARU: ZOOM (UPDATED FOR SERVER-SIDE AUTO DELETE) ---
+  // --- STATE ZOOM ---
   const [zoomMeetings, setZoomMeetings] = useState<any[]>([]);
   const [zoomJudul, setZoomJudul] = useState('');
   const [zoomLink, setZoomLink] = useState('');
   const [zoomWaktu, setZoomWaktu] = useState('');
-  const [zoomWaktuSelesai, setZoomWaktuSelesai] = useState(''); // State Baru untuk Waktu Selesai
-  const [zoomActive, setZoomActive] = useState(false);
+  const [zoomWaktuSelesai, setZoomWaktuSelesai] = useState('');
 
   // --- STATE INPUT ---
   const [judulPrak, setJudulPrak] = useState('');
-  const [mkPrak, setMkPrak] = useState('FISTAN');
-  const [golongan, setGolongan] = useState('C1');
+  const [mkPrak, setMkPrak] = useState('');
+  const [golongan, setGolongan] = useState('');
   const [linkPrak, setLinkPrak] = useState('');
   const [deadlinePrak, setDeadlinePrak] = useState('');
   const [deskripsiPrak, setDeskripsiPrak] = useState('');
@@ -45,10 +54,10 @@ export default function SuperAdminPage() {
 
   const [judulMateri, setJudulMateri] = useState('');
   const [mkMateri, setMkMateri] = useState('');
-  const [semesterMateri, setSemesterMateri] = useState(''); // State Baru untuk Input Semester Materi
+  const [semesterMateri, setSemesterMateri] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
-  // --- STATE PENGUMUMAN (BARU) ---
+  // --- STATE PENGUMUMAN ---
   const [pengumuman, setPengumuman] = useState<any[]>([]);
   const [judulPengumuman, setJudulPengumuman] = useState('');
   const [isiPengumuman, setIsiPengumuman] = useState('');
@@ -61,7 +70,6 @@ export default function SuperAdminPage() {
     return `${dateString}:00+07:00`;
   };
 
-  // Helper kecil khusus untuk format tampilan tanggal di pesan Telegram
   const formatTanggalTampil = (dateString: string) => {
     if (!dateString) return "-";
     try {
@@ -74,23 +82,136 @@ export default function SuperAdminPage() {
     }
   };
 
+  // --- CEK SESI LOGIN SAAT HALAMAN DIBUKA ---
+  useEffect(() => {
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setCheckingAuth(false);
+        return;
+      }
+      await loadAdminProfile(session.user.id);
+    };
+    initAuth();
+  }, []);
+
+  const loadAdminProfile = async (userId: string) => {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('id, nama, role, kelas_id, kelas:kelas_id(nama)')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const allowedRoles = ['admin', 'owner', 'pending_admin', 'rejected_admin'];
+    if (error || !profile || !allowedRoles.includes(profile.role)) {
+      alert('Akun ini bukan akun admin.');
+      await supabase.auth.signOut();
+      setAdminProfile(null);
+      setCheckingAuth(false);
+      return;
+    }
+
+    setAdminProfile({
+      id: profile.id,
+      nama: profile.nama || 'Admin',
+      kelas_id: profile.kelas_id,
+      kelas_nama: (profile as any).kelas?.nama || '-',
+      role: profile.role,
+    });
+
+    if (profile.role === 'owner') {
+      await fetchOwnerData();
+    }
+    setCheckingAuth(false);
+  };
+
+  // --- OWNER: kelola pengajuan admin ---
+  const fetchOwnerData = async () => {
+    setOwnerLoading(true);
+    const { data: pending } = await supabase
+      .from('profiles')
+      .select('id, nama, role, kelas_id, requested_at, kelas:kelas_id(nama)')
+      .eq('role', 'pending_admin')
+      .order('requested_at', { ascending: true });
+    const { data: aktif } = await supabase
+      .from('profiles')
+      .select('id, nama, role, kelas_id, kelas:kelas_id(nama)')
+      .eq('role', 'admin');
+    setPendingList(pending || []);
+    setAdminList(aktif || []);
+    setOwnerLoading(false);
+  };
+
+  const handleApproveAdmin = async (id: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: 'admin', approved_at: new Date().toISOString(), approved_by: adminProfile?.id })
+      .eq('id', id);
+    if (error) { alert('Gagal approve: ' + error.message); return; }
+    await fetchOwnerData();
+  };
+
+  const handleRejectAdmin = async (id: string) => {
+    if (!confirm('Yakin mau tolak pengajuan admin ini?')) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: 'rejected_admin' })
+      .eq('id', id);
+    if (error) { alert('Gagal menolak: ' + error.message); return; }
+    await fetchOwnerData();
+  };
+
+  const handleRevokeAdmin = async (id: string) => {
+    if (!confirm('Cabut hak admin akun ini?')) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: 'rejected_admin' })
+      .eq('id', id);
+    if (error) { alert('Gagal mencabut: ' + error.message); return; }
+    await fetchOwnerData();
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginEmail.trim(),
+      password: loginPassword,
+    });
+
+    if (error || !data.user) {
+      alert('Gagal login: ' + (error?.message || 'Email atau password salah.'));
+      setLoginLoading(false);
+      return;
+    }
+
+    await loadAdminProfile(data.user.id);
+    setLoginLoading(false);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setAdminProfile(null);
+  };
+
   const fetchData = async () => {
+    if (!adminProfile) return;
     const sekarang = new Date();
 
-    if (role === 'WEB') {
+    if (view === 'WEB') {
+      // RLS otomatis nyaring data cuma milik kelas admin yang login,
+      // jadi query di bawah ini nggak perlu .eq('kelas_id', ...) manual.
       const { data: dIzin } = await supabase.from('perizinan').select('*').order('created_at', { ascending: false });
       const { data: dPrak } = await supabase.from('tugas_praktikum').select('*').order('deadline', { ascending: true });
       const { data: dKuliah } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
 
-      // --- FETCH DATA VERIFIKASI MAHASISWA (FITUR TERBARU) ---
       const { data: dProfiles } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
       if (dProfiles) setProfiles(dProfiles);
 
-      // --- LOGIKA ZOOM (DATABASE CRON ENABLED) ---
       const { data: dZoomRaw } = await supabase.from('zoom_meetings').select('*').order('waktu_mulai', { ascending: true });
       if (dZoomRaw) setZoomMeetings(dZoomRaw);
 
-      // --- FETCH PENGUMUMAN (BARU) ---
       const { data: dPengumuman } = await supabase
         .from('pengumuman')
         .select('*')
@@ -113,9 +234,9 @@ export default function SuperAdminPage() {
       if (dKuliah) setTugasKuliah(dKuliah);
     }
 
-    if (role === 'ABSEN') {
+    if (view === 'ABSEN') {
       const { data: dAbsen } = await supabase.from('absensi').select('*').order('waktu_absen', { ascending: false });
-      const { data: sAbsen } = await supabase.from('status_sistem').select('*').eq('id', 'absensi').maybeSingle();
+      const { data: sAbsen } = await supabase.from('status_sistem').select('*').eq('kelas_id', adminProfile.kelas_id).maybeSingle();
       if (dAbsen) setAbsensi(dAbsen);
       if (sAbsen) {
         setAbsensiEnabled(sAbsen.is_active);
@@ -125,17 +246,10 @@ export default function SuperAdminPage() {
   };
 
   useEffect(() => {
-    if (role !== 'GUEST') fetchData();
-  }, [role]);
+    if (adminProfile && adminProfile.role === 'admin') fetchData();
+  }, [adminProfile, view]);
 
-  const handleLogin = (e: any) => {
-    e.preventDefault();
-    if (password === "adminC22") setRole('WEB');
-    else if (password === "absenC789") setRole('ABSEN');
-    else alert("Password Salah!");
-  };
-
-  // --- HANDLER VERIFIKASI MAHASISWA (FITUR TERBARU) ---
+  // --- HANDLER VERIFIKASI MAHASISWA ---
   const handleApproveStudent = async (id: string, nama: string, statusSaatIni: boolean) => {
     const targetStatus = !statusSaatIni;
     const { error } = await supabase
@@ -145,14 +259,11 @@ export default function SuperAdminPage() {
 
     if (!error) {
       alert(`Status verifikasi ${nama} berhasil diubah menjadi ${targetStatus ? 'TERVERIFIKASI' : 'BELUM ACC'}!`);
-
-      // Notifikasi Telegram: verifikasi mahasiswa
       sendTelegramNotification(
         `👤 <b>VERIFIKASI MAHASISWA</b>\n` +
         `Nama: <b>${nama}</b>\n` +
         `Status: <b>${targetStatus ? 'TERVERIFIKASI ✅' : 'DIBATALKAN ❌'}</b>`
       );
-
       fetchData();
     } else {
       alert("Gagal memperbarui status: " + error.message);
@@ -171,8 +282,9 @@ export default function SuperAdminPage() {
     }
   };
 
-  // --- HANDLER ZOOM (INTEGRATED WITH WAKTU_SELESAI) ---
+  // --- HANDLER ZOOM ---
   const handleAddZoom = async () => {
+    if (!adminProfile) return;
     if (!zoomJudul || !zoomLink || !zoomWaktu || !zoomWaktuSelesai) {
       return alert("Isi Judul, Link, Waktu Mulai & Selesai!");
     }
@@ -183,12 +295,11 @@ export default function SuperAdminPage() {
       waktu_mulai: formatToWIB(zoomWaktu),
       waktu_selesai: formatToWIB(zoomWaktuSelesai),
       is_active: true,
+      kelas_id: adminProfile.kelas_id,
     }]);
 
     if (!error) {
       alert("Jadwal Zoom Berhasil Ditambahkan!");
-
-      // Notifikasi Telegram: jadwal zoom baru
       sendTelegramNotification(
         `🎥 <b>JADWAL ZOOM BARU</b>\n` +
         `Judul: <b>${zoomJudul.trim()}</b>\n` +
@@ -196,7 +307,6 @@ export default function SuperAdminPage() {
         `Selesai: ${formatTanggalTampil(zoomWaktuSelesai)}\n` +
         `Link: ${zoomLink.trim()}`
       );
-
       setZoomJudul(''); setZoomLink(''); setZoomWaktu(''); setZoomWaktuSelesai('');
       fetchData();
     } else {
@@ -210,19 +320,19 @@ export default function SuperAdminPage() {
   };
 
   const handlePostTugasKuliah = async () => {
+    if (!adminProfile) return;
     if (!judulKuliah || !deadlineKuliah) return alert("Isi Judul & Deadline!");
     const { error } = await supabase.from('tugas_perkuliahan').insert([{
       judul_tugas: judulKuliah.trim(),
       mk_nama: mkKuliah.trim(),
       deadline: formatToWIB(deadlineKuliah),
       deskripsi: deskripsiKuliah.trim(),
-      link_pengumpulan: linkKuliah.trim()
+      link_pengumpulan: linkKuliah.trim(),
+      kelas_id: adminProfile.kelas_id,
     }]);
 
     if (!error) {
       alert("Tugas Kuliah Terbit!");
-
-      // Notifikasi Telegram: tugas perkuliahan baru
       sendTelegramNotification(
         `📚 <b>TUGAS PERKULIAHAN BARU</b>\n` +
         `Matkul: <b>${mkKuliah.trim() || "-"}</b>\n` +
@@ -230,27 +340,30 @@ export default function SuperAdminPage() {
         `Deadline: ${formatTanggalTampil(deadlineKuliah)}` +
         (linkKuliah.trim() ? `\nLink: ${linkKuliah.trim()}` : '')
       );
-
       setJudulKuliah(''); setMkKuliah(''); setDeadlineKuliah(''); setDeskripsiKuliah(''); setLinkKuliah('');
       fetchData();
+    } else {
+      alert("Gagal: " + error.message);
     }
   };
 
   const handlePostTugasPrak = async () => {
-    if (!judulPrak || !deadlinePrak) return alert("Isi Judul & Deadline!");
+    if (!adminProfile) return;
+    if (!judulPrak || !deadlinePrak || !mkPrak.trim() || !golongan.trim()) {
+      return alert("Isi Matkul, Golongan, Judul & Deadline!");
+    }
     const { error } = await supabase.from('tugas_praktikum').insert([{
       judul_tugas: judulPrak.trim(),
       mk_nama: mkPrak.trim().toUpperCase(),
       golongan: golongan.trim().toUpperCase(),
       deadline: formatToWIB(deadlinePrak),
       deskripsi: deskripsiPrak.trim(),
-      link_pengumpulan: linkPrak.trim()
+      link_pengumpulan: linkPrak.trim(),
+      kelas_id: adminProfile.kelas_id,
     }]);
 
     if (!error) {
       alert("Tugas Praktikum Terbit!");
-
-      // Notifikasi Telegram: tugas praktikum baru
       sendTelegramNotification(
         `🧪 <b>TUGAS PRAKTIKUM BARU</b>\n` +
         `Matkul: <b>${mkPrak.trim().toUpperCase()}</b> (Gol. ${golongan.trim().toUpperCase()})\n` +
@@ -258,15 +371,15 @@ export default function SuperAdminPage() {
         `Deadline: ${formatTanggalTampil(deadlinePrak)}` +
         (linkPrak.trim() ? `\nLink: ${linkPrak.trim()}` : '')
       );
-
-      setJudulPrak('');
-      setLinkPrak('');
-      setDeskripsiPrak('');
+      setJudulPrak(''); setMkPrak(''); setGolongan(''); setLinkPrak(''); setDeskripsiPrak(''); setDeadlinePrak('');
       fetchData();
+    } else {
+      alert("Gagal: " + error.message);
     }
   };
 
   const handleUploadMateri = async () => {
+    if (!adminProfile) return;
     if (!file) return alert("Silakan pilih file terlebih dahulu!");
     if (!judulMateri.trim()) return alert("Judul materi tidak boleh kosong!");
     if (!mkMateri.trim()) return alert("Nama Mata Kuliah tidak boleh kosong!");
@@ -292,17 +405,16 @@ export default function SuperAdminPage() {
         judul: judulMateri.trim(),
         file_url: urlData.publicUrl,
         mk_nama: mkMateri.trim(),
-        semester: parseInt(semesterMateri)
+        semester: parseInt(semesterMateri),
+        kelas_id: adminProfile.kelas_id,
       }]);
 
       if (dbError) {
         console.error("Database Error:", dbError);
-        return alert("File terupload, tapi GAGAL simpan ke Database: " + dbError.message);
+        return alert("File terupload, tapi GAGAL simpan ke Database: " + dbError.message + " (kolom kelas_id mungkin belum ada di tabel materi — cek lagi skemanya)");
       }
 
       alert("Materi Berhasil Diunggah dan Disimpan!");
-
-      // Notifikasi Telegram: materi baru
       sendTelegramNotification(
         `📄 <b>MATERI BARU DIUNGGAH</b>\n` +
         `Matkul: <b>${mkMateri.trim()}</b>\n` +
@@ -326,13 +438,15 @@ export default function SuperAdminPage() {
 
   const deleteData = async (id: any, table: string) => {
     if (confirm("Hapus data ini?")) {
-      await supabase.from(table).delete().eq('id', id);
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) alert("Gagal menghapus: " + error.message);
       fetchData();
     }
   };
 
-  // --- HANDLER PENGUMUMAN (BARU) ---
+  // --- HANDLER PENGUMUMAN ---
   const handlePostPengumuman = async () => {
+    if (!adminProfile) return;
     if (!judulPengumuman.trim() || !isiPengumuman.trim()) {
       return alert("Judul dan isi pengumuman wajib diisi!");
     }
@@ -341,10 +455,10 @@ export default function SuperAdminPage() {
       isi: isiPengumuman.trim(),
       link: linkPengumuman.trim() || null,
       is_pinned: pinPengumuman,
+      kelas_id: adminProfile.kelas_id,
     }]);
     if (error) return alert("Gagal posting pengumuman: " + error.message);
 
-    // Notifikasi Telegram: pengumuman baru
     sendTelegramNotification(
       `📢 <b>PENGUMUMAN BARU</b>\n` +
       `${judulPengumuman.trim()}\n\n` +
@@ -398,27 +512,39 @@ export default function SuperAdminPage() {
     doc.save(`Izin_${data.npm}.pdf`);
   };
 
-  const toggleAbsensi = async (status: boolean) => {
-    const { error } = await supabase.from('status_sistem').update({ is_active: status }).eq('id', 'absensi');
-    if (!error) {
-      setAbsensiEnabled(status);
+ const toggleAbsensi = async (status: boolean) => {
+    if (!adminProfile) return;
+    const { data, error } = await supabase
+      .from('status_sistem')
+      .upsert(
+        { kelas_id: adminProfile.kelas_id, is_active: status },
+        { onConflict: 'kelas_id' }
+      )
+      .select();
 
-      // Notifikasi Telegram: status absensi diubah
-      sendTelegramNotification(
-        `🚪 <b>STATUS ABSENSI DIUBAH</b>\n` +
-        `Status: <b>${status ? 'DIBUKA ✅' : 'DITUTUP ❌'}</b>`
-      );
-
-      fetchData();
+    if (error) {
+      alert("Gagal update status absensi: " + error.message);
+      return;
     }
-  };
+
+    if (!data || data.length === 0) {
+      alert("Update tidak menyentuh baris manapun. Kemungkinan RLS memblokir atau kelas_id tidak cocok.");
+      return;
+    }
+
+    setAbsensiEnabled(status);
+    sendTelegramNotification(
+      `🚪 <b>STATUS ABSENSI DIUBAH</b>\n` +
+      `Status: <b>${status ? 'DIBUKA ✅' : 'DITUTUP ❌'}</b>`
+    );
+    fetchData();
+};
 
   const updateKodeAbsen = async () => {
-    const { error } = await supabase.from('status_sistem').update({ kode_akses: kodeAbsen.toUpperCase() }).eq('id', 'absensi');
+    if (!adminProfile) return;
+    const { error } = await supabase.from('status_sistem').update({ kode_akses: kodeAbsen.toUpperCase() }).eq('kelas_id', adminProfile.kelas_id);
     if (!error) {
       alert("Kode Absen Berhasil Diperbarui!");
-
-      // Notifikasi Telegram: kode absen diperbarui
       sendTelegramNotification(
         `🔑 <b>KODE ABSEN DIPERBARUI</b>\n` +
         `Kode baru: <code>${kodeAbsen.toUpperCase()}</code>`
@@ -435,27 +561,153 @@ export default function SuperAdminPage() {
     return Object.entries(rekap);
   };
 
-  if (role === 'GUEST') return (
+  // --- LOADING SESI ---
+  if (checkingAuth) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // --- BELUM LOGIN ---
+  if (!adminProfile) return (
     <div className="flex h-screen items-center justify-center bg-slate-50">
-      <form onSubmit={handleLogin} className="p-8 bg-white shadow-xl rounded-3xl border-t-8 border-[#800020] w-full max-w-sm text-center">
-        <h2 className="text-xl font-black text-[#800020] mb-6 uppercase">Login Admin</h2>
-        <input type="password" placeholder="Password Admin" className="w-full p-4 border-2 rounded-2xl mb-4 text-center font-bold text-black" onChange={e => setPassword(e.target.value)} />
-        <button className="w-full bg-[#800020] text-white py-4 rounded-2xl font-black uppercase">Masuk</button>
+      <form onSubmit={handleLogin} className="p-8 bg-white shadow-xl rounded-3xl border-t-8 border-indigo-600 w-full max-w-sm text-center space-y-3">
+        <h2 className="text-xl font-black text-indigo-700 mb-2 uppercase">Login Admin</h2>
+        <input
+          type="email"
+          placeholder="Email admin"
+          className="w-full p-4 border-2 rounded-2xl text-center font-bold text-black"
+          value={loginEmail}
+          onChange={e => setLoginEmail(e.target.value)}
+          required
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          className="w-full p-4 border-2 rounded-2xl text-center font-bold text-black"
+          value={loginPassword}
+          onChange={e => setLoginPassword(e.target.value)}
+          required
+        />
+        <button
+          disabled={loginLoading}
+          className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase disabled:opacity-50"
+        >
+          {loginLoading ? "Memproses..." : "Masuk"}
+        </button>
+        <Link href="/api/admin/daftar" className="block text-xs text-slate-400 hover:text-indigo-600 pt-2">
+          Belum punya akun admin? Daftar di sini
+        </Link>
       </form>
     </div>
   );
 
+  // --- MENUNGGU PERSETUJUAN OWNER ---
+  if (adminProfile.role === 'pending_admin') return (
+    <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
+      <div className="p-8 bg-white shadow-xl rounded-3xl border-t-8 border-amber-500 w-full max-w-sm text-center space-y-3">
+        <p className="text-3xl">⏳</p>
+        <h2 className="text-lg font-black text-amber-600 uppercase">Menunggu Persetujuan</h2>
+        <p className="text-sm text-slate-500">
+          Halo {adminProfile.nama}, pengajuan admin kamu untuk kelas <b>{adminProfile.kelas_nama}</b> masih menunggu persetujuan owner. Coba login lagi nanti.
+        </p>
+        <button onClick={handleLogout} className="w-full bg-slate-100 text-slate-600 py-3 rounded-2xl font-bold uppercase text-xs">Keluar</button>
+      </div>
+    </div>
+  );
+
+  // --- PENGAJUAN DITOLAK ---
+  if (adminProfile.role === 'rejected_admin') return (
+    <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
+      <div className="p-8 bg-white shadow-xl rounded-3xl border-t-8 border-rose-500 w-full max-w-sm text-center space-y-3">
+        <p className="text-3xl">🚫</p>
+        <h2 className="text-lg font-black text-rose-600 uppercase">Pengajuan Ditolak</h2>
+        <p className="text-sm text-slate-500">
+          Halo {adminProfile.nama}, pengajuan admin kamu tidak disetujui oleh owner. Hubungi owner kalau ini keliru.
+        </p>
+        <button onClick={handleLogout} className="w-full bg-slate-100 text-slate-600 py-3 rounded-2xl font-bold uppercase text-xs">Keluar</button>
+      </div>
+    </div>
+  );
+
+  // --- OWNER: PANEL PERSETUJUAN ADMIN ---
+  if (adminProfile.role === 'owner') return (
+    <div className="p-6 md:p-10 max-w-4xl mx-auto space-y-8 bg-slate-50 min-h-screen font-sans text-slate-800">
+      <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <h1 className="text-xl font-black text-indigo-700 uppercase">Panel Owner</h1>
+        <button onClick={handleLogout} className="text-xs font-bold text-rose-500 uppercase">Keluar</button>
+      </div>
+
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+        <h2 className="font-black uppercase text-sm text-slate-600">Pengajuan Admin ({pendingList.length})</h2>
+        {ownerLoading && <p className="text-xs text-slate-400">Memuat...</p>}
+        {!ownerLoading && pendingList.length === 0 && <p className="text-xs text-slate-400">Tidak ada pengajuan menunggu.</p>}
+        {pendingList.map((p) => (
+          <div key={p.id} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
+            <div>
+              <p className="font-bold text-sm">{p.nama}</p>
+              <p className="text-xs text-slate-400">Kelas: {p.kelas?.nama || '-'}</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => handleApproveAdmin(p.id)} className="px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-black uppercase">Setujui</button>
+              <button onClick={() => handleRejectAdmin(p.id)} className="px-3 py-2 rounded-xl bg-rose-500 text-white text-xs font-black uppercase">Tolak</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+        <h2 className="font-black uppercase text-sm text-slate-600">Admin Aktif ({adminList.length})</h2>
+        {adminList.map((a) => (
+          <div key={a.id} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
+            <div>
+              <p className="font-bold text-sm">{a.nama}</p>
+              <p className="text-xs text-slate-400">Kelas: {a.kelas?.nama || '-'}</p>
+            </div>
+            <button onClick={() => handleRevokeAdmin(a.id)} className="px-3 py-2 rounded-xl bg-slate-200 text-slate-600 text-xs font-black uppercase">Cabut Akses</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // --- SUDAH LOGIN SEBAGAI ADMIN ---
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 bg-slate-50 min-h-screen font-sans text-slate-800">
       <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-        <h1 className="text-xl font-black text-[#800020] uppercase">{role === 'WEB' ? 'Admin Manajemen Konten' : 'Admin Absensi'}</h1>
-        <button onClick={() => setRole('GUEST')} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-black text-xs">LOGOUT</button>
+        <div>
+          <h1 className="text-xl font-black text-indigo-700 uppercase">
+            {view === 'WEB' ? 'Admin Manajemen Konten' : 'Admin Absensi'}
+          </h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">
+            {adminProfile.nama} • Kelas {adminProfile.kelas_nama}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-slate-100 rounded-xl p-1">
+            <button
+              onClick={() => setView('WEB')}
+              className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase ${view === 'WEB' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
+            >
+              Konten
+            </button>
+            <button
+              onClick={() => setView('ABSEN')}
+              className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase ${view === 'ABSEN' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
+            >
+              Absensi
+            </button>
+          </div>
+          <button onClick={handleLogout} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-black text-xs">LOGOUT</button>
+        </div>
       </div>
 
-      {role === 'WEB' ? (
+      {view === 'WEB' ? (
         <div className="space-y-10">
 
-          {/* MANAJEMEN ZOOM (UPDATED: SERVER-SIDE AUTO DELETE) */}
+          {/* MANAJEMEN ZOOM */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-[35px] shadow-lg text-white border-b-8 border-blue-900">
             <h2 className="font-black mb-4 uppercase text-xs flex items-center gap-2"><span>🎥</span> KONTROL JADWAL ZOOM MEETING</h2>
             <div className="grid md:grid-cols-6 gap-4 items-end mb-6">
@@ -511,13 +763,21 @@ export default function SuperAdminPage() {
             </div>
 
             <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#D4AF37]">
-              <h2 className="font-black mb-4 text-[#800020] uppercase text-xs">2. Post Praktikum</h2>
-              <select className="w-full border p-3 mb-2 rounded-xl text-xs font-bold text-black" value={mkPrak} onChange={e => {setMkPrak(e.target.value); setGolongan(e.target.value === 'DIT' ? 'B1' : 'C1');}}>
-                <option value="FISTAN">FISTAN</option><option value="DBT">DBT</option><option value="DPT">DPT</option><option value="DIT">DIT</option>
-              </select>
-              <select className="w-full border p-3 mb-2 rounded-xl text-xs font-bold text-black" value={golongan} onChange={e => setGolongan(e.target.value)}>
-                {mkPrak === 'DIT' ? (<><option value="B1">GOL B1</option><option value="B3">GOL B3</option><option value="C3">GOL C3</option></>) : (<><option value="C1">GOL C1</option><option value="C2">GOL C2</option><option value="C3">GOL C3</option></>)}
-              </select>
+              <h2 className="font-black mb-4 text-indigo-700 uppercase text-xs">2. Post Praktikum</h2>
+              <input
+                type="text"
+                placeholder="Mata Kuliah (contoh: FISTAN)"
+                className="w-full border p-3 mb-2 rounded-xl text-xs font-bold text-black"
+                value={mkPrak}
+                onChange={e => setMkPrak(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Golongan (contoh: C1)"
+                className="w-full border p-3 mb-2 rounded-xl text-xs font-bold text-black"
+                value={golongan}
+                onChange={e => setGolongan(e.target.value)}
+              />
               <input type="text" placeholder="Judul" className="w-full border p-3 mb-2 rounded-xl text-xs text-black" value={judulPrak} onChange={e => setJudulPrak(e.target.value)} />
               <input type="datetime-local" className="w-full border p-3 mb-2 rounded-xl text-xs text-black" value={deadlinePrak} onChange={e => setDeadlinePrak(e.target.value)} />
               <input type="text" placeholder="Link Pengumpulan" className="w-full border p-3 mb-2 rounded-xl text-xs bg-yellow-50 text-black" value={linkPrak} onChange={e => setLinkPrak(e.target.value)} />
@@ -525,20 +785,17 @@ export default function SuperAdminPage() {
               <button onClick={handlePostTugasPrak} className="w-full bg-[#D4AF37] text-white py-3 rounded-xl font-black text-xs shadow-md">PUBLISH</button>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-[#800020]">
+            <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-indigo-600">
               <h2 className="font-black mb-4 text-slate-700 uppercase text-xs">3. Upload Materi</h2>
               <input type="text" placeholder="Matkul" className="w-full border p-3 mb-2 rounded-xl text-xs text-black" value={mkMateri} onChange={e => setMkMateri(e.target.value)} />
               <input type="text" placeholder="Judul Materi" className="w-full border p-3 mb-2 rounded-xl text-xs text-black" value={judulMateri} onChange={e => setJudulMateri(e.target.value)} />
-
-              {/* Tambahan Input Semester Baru */}
-              <input type="number" placeholder="Semester (Contoh: 3)" className="w-full border p-3 mb-2 rounded-xl text-xs text-black font-bold focus:border-[#800020] outline-none" value={semesterMateri} onChange={e => setSemesterMateri(e.target.value)} min="1" />
-
+              <input type="number" placeholder="Semester (Contoh: 3)" className="w-full border p-3 mb-2 rounded-xl text-xs text-black font-bold focus:border-indigo-500 outline-none" value={semesterMateri} onChange={e => setSemesterMateri(e.target.value)} min="1" />
               <input type="file" className="w-full mb-4 text-[10px] text-black" onChange={e => setFile(e.target.files?.[0] || null)} />
-              <button onClick={handleUploadMateri} className="w-full bg-[#800020] text-white py-3 rounded-xl font-black text-xs shadow-md">UPLOAD</button>
+              <button onClick={handleUploadMateri} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-xs shadow-md">UPLOAD</button>
             </div>
           </div>
 
-          {/* MANAJEMEN PENGUMUMAN (BARU) */}
+          {/* MANAJEMEN PENGUMUMAN */}
           <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-indigo-600">
             <h2 className="font-black mb-4 text-indigo-700 uppercase text-xs">📢 Post Pengumuman</h2>
             <div className="grid md:grid-cols-2 gap-6">
@@ -643,13 +900,13 @@ export default function SuperAdminPage() {
                           <p className="text-[9px] font-bold text-slate-500">NPM: {i.npm}</p>
                         </div>
                         <div className="flex gap-3">
-                          <button onClick={() => downloadPDF(i)} className="text-[#800020] text-[10px] font-black hover:underline">PDF</button>
+                          <button onClick={() => downloadPDF(i)} className="text-indigo-700 text-[10px] font-black hover:underline">PDF</button>
                           <button onClick={() => deleteData(i.id, 'perizinan')} className="text-red-500 text-[10px] font-black hover:underline">X</button>
                         </div>
                       </div>
                       <div className="text-[9px] text-slate-600 font-medium pt-1 border-t border-dashed border-slate-200">
-                        <p><span className="font-bold text-[#800020]">MK:</span> {i.mk_nama || "-"}</p>
-                        <p><span className="font-bold text-[#800020]">Alasan:</span> {i.alasan || "-"}</p>
+                        <p><span className="font-bold text-indigo-700">MK:</span> {i.mk_nama || "-"}</p>
+                        <p><span className="font-bold text-indigo-700">Alasan:</span> {i.alasan || "-"}</p>
                         <p className="text-[8px] text-slate-400 italic mt-0.5">Izin untuk tanggal: {i.tgl_izin || "-"}</p>
                       </div>
                     </div>
@@ -664,7 +921,7 @@ export default function SuperAdminPage() {
                     hitungTotalPerTanggal().map(([tanggal, total]) => (
                       <div key={tanggal} className="flex justify-between items-center bg-slate-100 px-3 py-1.5 rounded-lg text-[9px] font-bold text-slate-700">
                         <span>{tanggal}</span>
-                        <span className="bg-[#800020] text-white px-2 py-0.5 rounded-full text-[8px] font-black">{total}</span>
+                        <span className="bg-indigo-700 text-white px-2 py-0.5 rounded-full text-[8px] font-black">{total}</span>
                       </div>
                     ))
                   ) : (
@@ -685,11 +942,11 @@ export default function SuperAdminPage() {
                   {absensiEnabled ? 'SISTEM: OPEN' : 'SISTEM: CLOSED'}
                 </button>
              </div>
-             <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-[#800020]">
+             <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-indigo-600">
                 <h2 className="font-black text-slate-800 uppercase text-xs mb-4">Kode Akses Hari Ini</h2>
                 <div className="flex gap-2">
-                  <input type="text" placeholder="SET KODE" className="flex-1 border-2 p-3 rounded-xl font-black text-center uppercase text-sm focus:border-[#800020] outline-none text-black" value={kodeAbsen} onChange={e => setKodeAbsen(e.target.value)} />
-                  <button onClick={updateKodeAbsen} className="bg-[#800020] text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-md">Simpan</button>
+                  <input type="text" placeholder="SET KODE" className="flex-1 border-2 p-3 rounded-xl font-black text-center uppercase text-sm focus:border-indigo-500 outline-none text-black" value={kodeAbsen} onChange={e => setKodeAbsen(e.target.value)} />
+                  <button onClick={updateKodeAbsen} className="bg-indigo-600 text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-md">Simpan</button>
                 </div>
              </div>
           </div>

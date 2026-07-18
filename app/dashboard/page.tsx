@@ -268,7 +268,7 @@ export default function Dashboard() {
   const quickAccessItems = [
     { name: 'Absen', href: '/absensi', icon: <ClipboardCheck size={22} />, comingSoon: false },
     { name: 'Materi', href: '/materi', icon: <BookOpen size={22} />, comingSoon: false },
-    { name: 'Kelompok', href: '/kelompok', icon: <Users size={22} />, comingSoon: true },
+    { name: 'Kelompok', href: '/acak-kelompok', icon: <Users size={22} />, comingSoon: false },
     { name: 'Presentasi', href: '/presentasi', icon: <MonitorPlay size={22} />, comingSoon: false },
     { name: 'Zora AI', href: '/zora-ai', icon: <Sparkles size={22} />, comingSoon: true },
   ];

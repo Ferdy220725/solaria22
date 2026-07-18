@@ -259,11 +259,14 @@ export default function SuperAdminPage() {
 
     if (!error) {
       alert(`Status verifikasi ${nama} berhasil diubah menjadi ${targetStatus ? 'TERVERIFIKASI' : 'BELUM ACC'}!`);
-      sendTelegramNotification(
-        `👤 <b>VERIFIKASI MAHASISWA</b>\n` +
-        `Nama: <b>${nama}</b>\n` +
-        `Status: <b>${targetStatus ? 'TERVERIFIKASI ✅' : 'DIBATALKAN ❌'}</b>`
-      );
+      if (adminProfile) {
+        sendTelegramNotification(
+          adminProfile.kelas_id,
+          `👤 <b>VERIFIKASI MAHASISWA</b>\n` +
+          `Nama: <b>${nama}</b>\n` +
+          `Status: <b>${targetStatus ? 'TERVERIFIKASI ✅' : 'DIBATALKAN ❌'}</b>`
+        );
+      }
       fetchData();
     } else {
       alert("Gagal memperbarui status: " + error.message);
@@ -301,6 +304,7 @@ export default function SuperAdminPage() {
     if (!error) {
       alert("Jadwal Zoom Berhasil Ditambahkan!");
       sendTelegramNotification(
+        adminProfile.kelas_id,
         `🎥 <b>JADWAL ZOOM BARU</b>\n` +
         `Judul: <b>${zoomJudul.trim()}</b>\n` +
         `Mulai: ${formatTanggalTampil(zoomWaktu)}\n` +
@@ -334,6 +338,7 @@ export default function SuperAdminPage() {
     if (!error) {
       alert("Tugas Kuliah Terbit!");
       sendTelegramNotification(
+        adminProfile.kelas_id,
         `📚 <b>TUGAS PERKULIAHAN BARU</b>\n` +
         `Matkul: <b>${mkKuliah.trim() || "-"}</b>\n` +
         `Judul: ${judulKuliah.trim()}\n` +
@@ -365,6 +370,7 @@ export default function SuperAdminPage() {
     if (!error) {
       alert("Tugas Praktikum Terbit!");
       sendTelegramNotification(
+        adminProfile.kelas_id,
         `🧪 <b>TUGAS PRAKTIKUM BARU</b>\n` +
         `Matkul: <b>${mkPrak.trim().toUpperCase()}</b> (Gol. ${golongan.trim().toUpperCase()})\n` +
         `Judul: ${judulPrak.trim()}\n` +
@@ -416,6 +422,7 @@ export default function SuperAdminPage() {
 
       alert("Materi Berhasil Diunggah dan Disimpan!");
       sendTelegramNotification(
+        adminProfile.kelas_id,
         `📄 <b>MATERI BARU DIUNGGAH</b>\n` +
         `Matkul: <b>${mkMateri.trim()}</b>\n` +
         `Judul: ${judulMateri.trim()}\n` +
@@ -460,6 +467,7 @@ export default function SuperAdminPage() {
     if (error) return alert("Gagal posting pengumuman: " + error.message);
 
     sendTelegramNotification(
+      adminProfile.kelas_id,
       `📢 <b>PENGUMUMAN BARU</b>\n` +
       `${judulPengumuman.trim()}\n\n` +
       `${isiPengumuman.trim()}` +
@@ -534,6 +542,7 @@ export default function SuperAdminPage() {
 
     setAbsensiEnabled(status);
     sendTelegramNotification(
+      adminProfile.kelas_id,
       `🚪 <b>STATUS ABSENSI DIUBAH</b>\n` +
       `Status: <b>${status ? 'DIBUKA ✅' : 'DITUTUP ❌'}</b>`
     );
@@ -546,6 +555,7 @@ export default function SuperAdminPage() {
     if (!error) {
       alert("Kode Absen Berhasil Diperbarui!");
       sendTelegramNotification(
+        adminProfile.kelas_id,
         `🔑 <b>KODE ABSEN DIPERBARUI</b>\n` +
         `Kode baru: <code>${kodeAbsen.toUpperCase()}</code>`
       );

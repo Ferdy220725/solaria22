@@ -1,15 +1,33 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { X, Gift, Calendar, Edit2, ChevronLeft, ChevronRight, Clock, MapPin } from 'lucide-react'
+import { X, Gift, Calendar, Edit2, ChevronLeft, ChevronRight, Clock, MapPin, AlertTriangle } from 'lucide-react'
 
-interface Jadwal {
+interface JadwalTemplate {
   id: number;
+  hari: number; // 0 = Minggu ... 6 = Sabtu
   subject: string;
   time: string;
   room: string;
-  day: string;
-  is_published: boolean;
+  is_active: boolean;
+}
+
+interface JadwalPengecualian {
+  id: number;
+  subject: string | null;
+  time: string | null;
+  room: string | null;
+  day: string; // YYYY-MM-DD
+  tipe: 'ganti' | 'tambahan' | 'libur';
+  keterangan: string | null;
+}
+
+interface JadwalTampil {
+  key: string;
+  subject: string;
+  time: string;
+  room: string;
+  isException: boolean;
 }
 
 interface HariPenting {
@@ -18,7 +36,10 @@ interface HariPenting {
 }
 
 export default function KalenderJadwal() {
-  const [jadwal, setJadwal] = useState<Jadwal[]>([])
+  const [jadwalTemplate, setJadwalTemplate] = useState<JadwalTemplate[]>([])
+  const [jadwalPengecualian, setJadwalPengecualian] = useState<JadwalPengecualian[]>([])
+  const [kelasId, setKelasId] = useState<string | null>(null)
+  const [loadingKelas, setLoadingKelas] = useState(true)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [hariIni] = useState(new Date())
 
@@ -52,7 +73,8 @@ export default function KalenderJadwal() {
   }
 
   // Bawaan Asli (TETAP AMAN)
-  const [selectedJadwal, setSelectedJadwal] = useState<Jadwal[] | null>(null)
+  const [selectedJadwal, setSelectedJadwal] = useState<JadwalTampil[] | null>(null)
+  const [selectedLiburInfo, setSelectedLiburInfo] = useState<string | null>(null)
   const [selectedDateLabel, setSelectedDateLabel] = useState("")
 
   const supabase = createClient()
@@ -66,20 +88,41 @@ export default function KalenderJadwal() {
   const hariPertama = new Date(year, month, 1).getDay()
   const listHari = Array.from({ length: jumlahHari }, (_, i) => i + 1)
 
-  // Fungsi Fetching Asli (TETAP AMAN)
-  const getData = async () => {
-    const { data } = await supabase
-      .from('jadwal_kuliah')
-      .select('*')
-      .eq('is_published', true)
-    if (data) setJadwal(data as Jadwal[])
+  // --- Ambil kelas_id milik mahasiswa yang sedang login ---
+  const getKelasId = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      setLoadingKelas(false)
+      return
+    }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('kelas_id')
+      .eq('id', session.user.id)
+      .maybeSingle()
+
+    if (profile?.kelas_id) setKelasId(profile.kelas_id)
+    setLoadingKelas(false)
   }
 
-  // Realtime Subscriptions Asli (TETAP AMAN)
+  // --- Fetching Jadwal Mingguan + Pengecualian, difilter per kelas ---
+  const getData = async (kelasIdParam: string) => {
+    const { data: dTemplate } = await supabase
+      .from('jadwal_template')
+      .select('*')
+      .eq('kelas_id', kelasIdParam)
+      .eq('is_active', true)
+    if (dTemplate) setJadwalTemplate(dTemplate as JadwalTemplate[])
+
+    const { data: dPengecualian } = await supabase
+      .from('jadwal_kuliah')
+      .select('*')
+      .eq('kelas_id', kelasIdParam)
+    if (dPengecualian) setJadwalPengecualian(dPengecualian as JadwalPengecualian[])
+  }
+
   useEffect(() => {
-    getData()
-    const sub = supabase.channel('realtime_calendar').on('postgres_changes',
-      { event: '*', schema: 'public', table: 'jadwal_kuliah' }, getData).subscribe()
+    getKelasId()
 
     // Cek Ulang Tahun di LocalStorage saat Pertama Masuk
     const savedUltah = localStorage.getItem('user_birthday')
@@ -89,9 +132,24 @@ export default function KalenderJadwal() {
       setUltahUser(savedUltah)
       cekApakahHariIniUltah(savedUltah)
     }
+  }, [])
+
+  // Realtime Subscriptions — nunggu kelasId ketemu dulu baru subscribe
+  useEffect(() => {
+    if (!kelasId) return
+    getData(kelasId)
+
+    const sub = supabase.channel('realtime_calendar')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'jadwal_kuliah', filter: `kelas_id=eq.${kelasId}` },
+        () => getData(kelasId))
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'jadwal_template', filter: `kelas_id=eq.${kelasId}` },
+        () => getData(kelasId))
+      .subscribe()
 
     return () => { supabase.removeChannel(sub) }
-  }, [])
+  }, [kelasId])
 
   // Fungsi Pendukung Ulang Tahun (TETAP AMAN)
   const simpanUlangThn = (e: React.FormEvent) => {
@@ -117,11 +175,70 @@ export default function KalenderJadwal() {
     setCurrentDate(new Date(year, month + offset, 1))
   }
 
-  const handleDateClick = (tgl: number, jadwalHariIni: Jadwal[]) => {
-    if (jadwalHariIni.length > 0) {
+  // --- INTI LOGIKA GABUNGAN: Template Mingguan + Pengecualian Tanggal ---
+  const getJadwalUntukTanggal = (tanggalFull: string, hariIndex: number): { list: JadwalTampil[]; liburInfo: string | null } => {
+    const pengecualianHariIni = jadwalPengecualian.filter(p => p.day === tanggalFull)
+    const liburEntry = pengecualianHariIni.find(p => p.tipe === 'libur')
+
+    if (liburEntry) {
+      return { list: [], liburInfo: liburEntry.keterangan || 'Tidak ada perkuliahan' }
+    }
+
+    const gantiEntries = pengecualianHariIni.filter(p => p.tipe === 'ganti')
+    const tambahanEntries = pengecualianHariIni.filter(p => p.tipe === 'tambahan')
+
+    // Kalau ada pengecualian tipe "ganti", jadwal mingguan hari itu diabaikan total
+    const basis: JadwalTampil[] = gantiEntries.length > 0
+      ? gantiEntries.map(p => ({
+          key: `ganti-${p.id}`,
+          subject: p.subject || '-',
+          time: p.time || '-',
+          room: p.room || '-',
+          isException: true,
+        }))
+      : jadwalTemplate
+          .filter(t => t.hari === hariIndex)
+          .map(t => ({
+            key: `template-${t.id}`,
+            subject: t.subject,
+            time: t.time,
+            room: t.room || '-',
+            isException: false,
+          }))
+
+    const tambahan: JadwalTampil[] = tambahanEntries.map(p => ({
+      key: `tambahan-${p.id}`,
+      subject: p.subject || '-',
+      time: p.time || '-',
+      room: p.room || '-',
+      isException: true,
+    }))
+
+    return { list: [...basis, ...tambahan], liburInfo: null }
+  }
+
+  const handleDateClick = (tgl: number, jadwalHariIni: JadwalTampil[], liburInfo: string | null) => {
+    if (jadwalHariIni.length > 0 || liburInfo) {
       setSelectedJadwal(jadwalHariIni)
+      setSelectedLiburInfo(liburInfo)
       setSelectedDateLabel(`${tgl} ${namaBulan[month]} ${year}`)
     }
+  }
+
+  if (loadingKelas) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f7fb] dark:bg-[#0a0a0a]">
+        <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!kelasId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f7fb] dark:bg-[#0a0a0a] p-6 text-center">
+        <p className="text-sm font-bold text-slate-400">Silakan login terlebih dahulu untuk melihat jadwal kelasmu.</p>
+      </div>
+    )
   }
 
   return (
@@ -187,20 +304,22 @@ export default function KalenderJadwal() {
               const formatD = String(tgl).padStart(2, '0')
               const tanggalFull = `${year}-${formatM}-${formatD}`
               const mDanD = `${formatM}-${formatD}`
+              const hariIndex = new Date(year, month, tgl).getDay()
 
-              const jadwalHariIni = jadwal.filter(j => j.day === tanggalFull)
+              const { list: jadwalHariIni, liburInfo } = getJadwalUntukTanggal(tanggalFull, hariIndex)
               const detailHariPenting = daftarHariPenting[tanggalFull]
               const isLibur = detailHariPenting?.isLibur || false
+              const isLiburKelas = !!liburInfo
               const isHariIni = hariIni.getDate() === tgl && hariIni.getMonth() === month && hariIni.getFullYear() === year
               const isUserUltah = ultahUser === mDanD
 
               return (
                 <div
                   key={tgl}
-                  onClick={() => handleDateClick(tgl, jadwalHariIni)}
+                  onClick={() => handleDateClick(tgl, jadwalHariIni, liburInfo)}
                   className={`h-24 md:h-32 p-2 relative flex flex-col justify-between group select-none overflow-hidden transition-colors
                     bg-white dark:bg-[#141414] hover:bg-slate-50 dark:hover:bg-white/5
-                    ${jadwalHariIni.length > 0 ? 'cursor-pointer' : ''}
+                    ${(jadwalHariIni.length > 0 || isLiburKelas) ? 'cursor-pointer' : ''}
                     ${isHariIni ? 'ring-2 ring-inset ring-indigo-500' : ''}
                   `}
                 >
@@ -231,8 +350,14 @@ export default function KalenderJadwal() {
                       </div>
                     )}
 
+                    {isLiburKelas && (
+                      <div className="text-[9px] font-bold px-1.5 py-1 rounded-lg leading-tight text-center break-words text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/10">
+                        Libur Kelas
+                      </div>
+                    )}
+
                     {jadwalHariIni.slice(0, 2).map((j) => (
-                      <div key={j.id} className="bg-indigo-600 text-[9px] text-white px-1.5 py-1 rounded-lg font-bold truncate">
+                      <div key={j.key} className={`text-[9px] text-white px-1.5 py-1 rounded-lg font-bold truncate ${j.isException ? 'bg-amber-500' : 'bg-indigo-600'}`}>
                         {j.subject}
                       </div>
                     ))}
@@ -313,7 +438,7 @@ export default function KalenderJadwal() {
           </div>
         )}
 
-        {/* Modal Detail Jadwal Kuliah Bawaan Asli (TETAP AMAN) */}
+        {/* Modal Detail Jadwal Kuliah (Update: dukung info Libur & badge pengecualian) */}
         {selectedJadwal && (
           <div className="fixed inset-0 z-[99] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white dark:bg-[#141414] w-full max-w-sm rounded-[28px] overflow-hidden shadow-2xl border border-slate-100 dark:border-white/10">
@@ -322,14 +447,29 @@ export default function KalenderJadwal() {
                   <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-100">Detail Jadwal</p>
                   <h2 className="text-lg font-black">{selectedDateLabel}</h2>
                 </div>
-                <button onClick={() => setSelectedJadwal(null)} className="p-2 bg-black/20 rounded-full hover:bg-black/30 transition">
+                <button onClick={() => { setSelectedJadwal(null); setSelectedLiburInfo(null); }} className="p-2 bg-black/20 rounded-full hover:bg-black/30 transition">
                   <X size={18} />
                 </button>
               </div>
               <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
-                {selectedJadwal.map((j) => (
-                  <div key={j.id} className="bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-100 dark:border-white/10">
-                    <h3 className="text-slate-900 dark:text-white font-black text-base leading-tight mb-3">{j.subject}</h3>
+                {selectedLiburInfo ? (
+                  <div className="bg-rose-50 dark:bg-rose-500/10 p-4 rounded-2xl border border-rose-100 dark:border-rose-500/20 flex items-start gap-3">
+                    <AlertTriangle size={18} className="text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-rose-700 dark:text-rose-400 font-black text-sm">Tidak Ada Perkuliahan</p>
+                      <p className="text-rose-600/80 dark:text-rose-400/70 text-xs mt-0.5">{selectedLiburInfo}</p>
+                    </div>
+                  </div>
+                ) : selectedJadwal.map((j) => (
+                  <div key={j.key} className="bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-100 dark:border-white/10">
+                    <div className="flex items-center gap-2 mb-3">
+                      <h3 className="text-slate-900 dark:text-white font-black text-base leading-tight">{j.subject}</h3>
+                      {j.isException && (
+                        <span className="text-[8px] font-black uppercase bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 px-2 py-0.5 rounded-full">
+                          Perubahan
+                        </span>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
@@ -354,7 +494,7 @@ export default function KalenderJadwal() {
                 ))}
               </div>
               <button
-                onClick={() => setSelectedJadwal(null)}
+                onClick={() => { setSelectedJadwal(null); setSelectedLiburInfo(null); }}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 font-black uppercase tracking-widest text-xs transition-colors"
               >
                 Tutup Informasi

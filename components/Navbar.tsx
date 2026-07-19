@@ -79,6 +79,20 @@ const mobileTabItems: NavItem[] = [
   { id: "profil", name: "Profil", href: "/akun-saya", icon: <User size={22} /> },
 ];
 
+// Halaman-halaman yang butuh tampilan full-screen sendiri (mode presentasi & remote audiens),
+// jadi navbar (header atas + bottom tab bar) harus disembunyikan total di sini,
+// bukan cuma saat browser Fullscreen API aktif.
+const FULLSCREEN_ROUTE_PREFIXES = [
+  "/presentasi/remote/", // halaman remote/laser-pointer buat audiens
+];
+
+function isFullscreenRoute(pathname: string) {
+  // Route /presentasi/[kode]/present/[itemId] juga harus full-screen (mode presenter),
+  // tapi /presentasi/[kode] (lobby) dan /presentasi (home) TIDAK termasuk.
+  if (/^\/presentasi\/[^/]+\/present\//.test(pathname)) return true;
+  return FULLSCREEN_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const [shouldShow, setShouldShow] = useState(false);
@@ -112,7 +126,9 @@ export default function Navbar() {
     };
   }, []);
 
-  if (!shouldShow || isFullscreen) return null;
+  // Sembunyikan juga (tanpa perlu browser Fullscreen API) di halaman-halaman
+  // yang memang didesain full-screen sendiri, misal remote presentasi di HP
+  if (!shouldShow || isFullscreen || isFullscreenRoute(pathname)) return null;
 
   const handleItemClick = (item: NavItem, e: React.MouseEvent) => {
     if (item.comingSoon) {

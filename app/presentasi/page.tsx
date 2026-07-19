@@ -1,24 +1,81 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { generateKode } from "@/lib/generateKode";
 import { MonitorPlay, LogIn } from "lucide-react";
 
+type Retensi = "24h" | "permanent";
+
 export default function PresentasiHome() {
   const [namaSesi, setNamaSesi] = useState("");
-  const [retensi, setRetensi] = useState<"24h" | "permanent">("24h");
+  const [retensi, setRetensi] = useState<Retensi>("24h");
   const [kodeMasuk, setKodeMasuk] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Profil user: kelas_id & role, diambil sekali saat halaman dibuka
+  const [kelasId, setKelasId] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const supabase = createClient();
   const router = useRouter();
 
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      setProfileLoading(true);
+      setProfileError(null);
+
+      const {
+        data: { user },
+        error: userErr,
+      } = await supabase.auth.getUser();
+
+      if (userErr || !user) {
+        if (mounted) {
+          setProfileError("Kamu belum login. Silakan login dulu untuk membuat sesi.");
+          setProfileLoading(false);
+        }
+        return;
+      }
+
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("kelas_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!mounted) return;
+
+      if (profileErr || !profile) {
+        setProfileError("Gagal memuat profil kamu. Coba refresh halaman ini.");
+        setProfileLoading(false);
+        return;
+      }
+
+      setKelasId(profile.kelas_id);
+      setProfileLoading(false);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [supabase]);
+
   const handleBuatSesi = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!namaSesi.trim()) return;
+
+    if (!kelasId) {
+      alert("Kelas kamu belum terdeteksi. Pastikan profil kamu sudah terhubung ke kelas.");
+      return;
+    }
     setLoading(true);
+
+    let lastError: string | null = null;
 
     for (let attempt = 0; attempt < 5; attempt++) {
       const kode = generateKode();
@@ -32,16 +89,27 @@ export default function PresentasiHome() {
         nama_sesi: namaSesi.trim(),
         retensi,
         expires_at,
+        kelas_id: kelasId, // wajib, karena policy INSERT butuh kelas_id = current_kelas_id()
       });
 
       if (!error) {
         router.push(`/presentasi/${kode}`);
         return;
       }
-      if (!error.message.includes("duplicate")) break;
+
+      lastError = error.message;
+      console.error("Insert sesi_presentasi gagal:", error);
+
+      // Kalau errornya bukan soal duplicate kode, tidak ada gunanya retry
+      if (!error.message.toLowerCase().includes("duplicate")) break;
     }
+
     setLoading(false);
-    alert("Gagal membuat sesi, coba lagi.");
+    alert(
+      lastError
+        ? `Gagal membuat sesi: ${lastError}`
+        : "Gagal membuat sesi, coba lagi."
+    );
   };
 
   const handleMasuk = (e: React.FormEvent) => {
@@ -50,6 +118,8 @@ export default function PresentasiHome() {
     if (!kode) return;
     router.push(`/presentasi/${kode}`);
   };
+
+  const buatSesiDisabled = loading || profileLoading || !kelasId;
 
   return (
     <div className="w-full min-h-screen bg-[#f7f7fb] dark:bg-[#0a0a0a]">
@@ -60,6 +130,12 @@ export default function PresentasiHome() {
         <p className="text-slate-400 font-medium mb-8 sm:mb-10 text-sm">
           Upload PPT kelompokmu, tinggal buka pas presentasi. Tanpa cari-cari file lagi.
         </p>
+
+        {profileError && (
+          <div className="mb-6 rounded-2xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm font-medium text-red-600 dark:text-red-400">
+            {profileError}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Buat Sesi */}
@@ -79,7 +155,8 @@ export default function PresentasiHome() {
               placeholder="Nama sesi, misal: Kelas C - 5 Juli"
               value={namaSesi}
               onChange={(e) => setNamaSesi(e.target.value)}
-              className="w-full border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+              disabled={buatSesiDisabled}
+              className="w-full border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-50"
               required
             />
 
@@ -89,6 +166,7 @@ export default function PresentasiHome() {
                   type="radio"
                   checked={retensi === "24h"}
                   onChange={() => setRetensi("24h")}
+                  disabled={buatSesiDisabled}
                   className="accent-indigo-600"
                 />
                 Hapus otomatis 24 jam
@@ -98,6 +176,7 @@ export default function PresentasiHome() {
                   type="radio"
                   checked={retensi === "permanent"}
                   onChange={() => setRetensi("permanent")}
+                  disabled={buatSesiDisabled}
                   className="accent-indigo-600"
                 />
                 Simpan permanen
@@ -106,10 +185,10 @@ export default function PresentasiHome() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={buatSesiDisabled}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-xs tracking-widest py-3.5 rounded-2xl shadow-md disabled:opacity-50 active:scale-95 transition-all"
             >
-              {loading ? "Membuat..." : "Buat Sesi"}
+              {profileLoading ? "Memuat..." : loading ? "Membuat..." : "Buat Sesi"}
             </button>
           </form>
 

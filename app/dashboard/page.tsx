@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
+import AktifkanNotifikasi from '@/components/AktifkanNotifikasi';
 import { toast } from 'sonner';
 import {
   ClipboardList,
@@ -353,6 +354,8 @@ export default function Dashboard() {
                 <CalendarCheck size={18} />
               </div>
             </div>
+
+            <AktifkanNotifikasi />
 
             {/* QUICK STAT CARDS */}
             <div>

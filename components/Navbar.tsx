@@ -48,6 +48,7 @@ const mainNavItems: NavItem[] = [
   { id: "zora-ai", name: "Zora AI", href: "/zora-ai", icon: <Sparkles size={20} />, comingSoon: true },
   { id: "pengumuman", name: "Pengumuman", href: "/pengumuman", icon: <Megaphone size={20} /> },
   { id: "laporan", name: "Laporan", href: "/laporan", icon: <ClipboardList size={20} /> },
+  { id: "profil", name: "Profil", href: "/akun-saya", icon: <User size={22} /> },
   {
     id: "khs",
     name: "KHS",

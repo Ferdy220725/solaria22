@@ -83,6 +83,7 @@ export default function Dashboard() {
   const [riwayatBukti, setRiwayatBukti] = useState<Record<string, BuktiTugas>>({});
 
   // kelas_id milik user yang login, dipakai saat insert ke bukti_tugas (kolom NOT NULL)
+  // dan juga buat filter jadwal hari ini
   const [kelasId, setKelasId] = useState<string | null>(null);
 
   const supabase = createClient();
@@ -113,6 +114,62 @@ export default function Dashboard() {
     return () => clearInterval(zoomTimer);
   }, []);
 
+  // --- Ambil jadwal hari ini: gabungan jadwal_template (mingguan) + jadwal_kuliah (pengecualian) ---
+  const fetchJadwalHariIni = async (kelasIdParam: string) => {
+    const hariIndexHariIni = today.getDay(); // 0=Minggu...6=Sabtu, cocok sama kolom `hari` di jadwal_template
+
+    const { data: dTemplate } = await supabase
+      .from('jadwal_template')
+      .select('*')
+      .eq('kelas_id', kelasIdParam)
+      .eq('is_active', true)
+      .eq('hari', hariIndexHariIni);
+
+    const { data: dPengecualian } = await supabase
+      .from('jadwal_kuliah')
+      .select('*')
+      .eq('kelas_id', kelasIdParam)
+      .eq('day', todayStr);
+
+    const liburEntry = dPengecualian?.find((p: any) => p.tipe === 'libur');
+
+    // Kalau hari ini ditandai libur oleh admin, jadwal mingguan diabaikan total
+    if (liburEntry) {
+      setJadwalHariIni([]);
+      return;
+    }
+
+    const gantiEntries = dPengecualian?.filter((p: any) => p.tipe === 'ganti') || [];
+    const tambahanEntries = dPengecualian?.filter((p: any) => p.tipe === 'tambahan') || [];
+
+    // Kalau ada pengecualian tipe "ganti", jadwal mingguan hari itu diabaikan, dipakai penggantinya
+    const basis: Jadwal[] = gantiEntries.length > 0
+      ? gantiEntries.map((p: any) => ({
+          id: p.id,
+          subject: p.subject || '-',
+          time: p.time || '-',
+          room: p.room || '-',
+          day: todayStr,
+        }))
+      : (dTemplate || []).map((t: any) => ({
+          id: t.id,
+          subject: t.subject,
+          time: t.time,
+          room: t.room || '-',
+          day: todayStr,
+        }));
+
+    const tambahan: Jadwal[] = tambahanEntries.map((p: any) => ({
+      id: p.id,
+      subject: p.subject || '-',
+      time: p.time || '-',
+      room: p.room || '-',
+      day: todayStr,
+    }));
+
+    setJadwalHariIni([...basis, ...tambahan].sort((a, b) => a.time.localeCompare(b.time)));
+  };
+
   const fetchDataAndSync = async () => {
     const { data: teoriData } = await supabase.from('tugas_perkuliahan').select('*').order('deadline', { ascending: true });
     if (teoriData) setTugas(teoriData as Tugas[]);
@@ -122,15 +179,6 @@ export default function Dashboard() {
 
     const { data: zData } = await supabase.from('zoom_meetings').select('*').eq('is_active', true).order('waktu_mulai', { ascending: true });
     if (zData) setZoomMeetings(zData);
-
-    const { data: jData } = await supabase
-      .from('jadwal_kuliah')
-      .select('*')
-      .eq('is_published', true)
-      .eq('day', todayStr);
-    if (jData) {
-      setJadwalHariIni((jData as Jadwal[]).sort((a, b) => a.time.localeCompare(b.time)));
-    }
 
     const { data: pData } = await supabase
       .from('pengumuman')
@@ -146,13 +194,19 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (user) {
-      // Ambil kelas_id user sekali di sini, dipakai lagi saat submit bukti tugas
+      // Ambil kelas_id user di sini — dipakai buat jadwal hari ini & saat submit bukti tugas
       const { data: profile } = await supabase
         .from('profiles')
         .select('kelas_id')
         .eq('id', user.id)
         .maybeSingle();
-      if (profile) setKelasId(profile.kelas_id);
+
+      if (profile?.kelas_id) {
+        setKelasId(profile.kelas_id);
+        await fetchJadwalHariIni(profile.kelas_id);
+      } else {
+        setJadwalHariIni([]);
+      }
 
       const { data: buktiData } = await supabase
         .from('bukti_tugas')
@@ -175,6 +229,7 @@ export default function Dashboard() {
     } else {
       const currentCompletedTasks = JSON.parse(localStorage.getItem('agrotek_completed_tasks') || '[]');
       setCompletedTaskIds(currentCompletedTasks);
+      setJadwalHariIni([]);
     }
   };
 

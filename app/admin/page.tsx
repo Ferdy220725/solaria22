@@ -12,7 +12,7 @@ export default function SuperAdminPage() {
   const [pendingList, setPendingList] = useState<any[]>([]);
   const [adminList, setAdminList] = useState<any[]>([]);
   const [ownerLoading, setOwnerLoading] = useState(false);
-  const [view, setView] = useState<'WEB' | 'ABSEN'>('WEB');
+  const [view, setView] = useState<'WEB' | 'ABSEN' | 'JADWAL'>('WEB');
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -37,6 +37,23 @@ export default function SuperAdminPage() {
   const [zoomLink, setZoomLink] = useState('');
   const [zoomWaktu, setZoomWaktu] = useState('');
   const [zoomWaktuSelesai, setZoomWaktuSelesai] = useState('');
+
+  // --- STATE JADWAL AKADEMIK (BARU) ---
+  const namaHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const [jadwalTemplate, setJadwalTemplate] = useState<any[]>([]);
+  const [jadwalPengecualian, setJadwalPengecualian] = useState<any[]>([]);
+
+  const [hariTemplate, setHariTemplate] = useState('1'); // default Senin
+  const [subjectTemplate, setSubjectTemplate] = useState('');
+  const [timeTemplate, setTimeTemplate] = useState('');
+  const [roomTemplate, setRoomTemplate] = useState('');
+
+  const [tglPengecualian, setTglPengecualian] = useState('');
+  const [tipePengecualian, setTipePengecualian] = useState('ganti');
+  const [subjectPengecualian, setSubjectPengecualian] = useState('');
+  const [timePengecualian, setTimePengecualian] = useState('');
+  const [roomPengecualian, setRoomPengecualian] = useState('');
+  const [keteranganPengecualian, setKeteranganPengecualian] = useState('');
 
   // --- STATE INPUT ---
   const [judulPrak, setJudulPrak] = useState('');
@@ -242,6 +259,20 @@ export default function SuperAdminPage() {
         setAbsensiEnabled(sAbsen.is_active);
         setKodeAbsen(sAbsen.kode_akses || '');
       }
+    }
+
+    if (view === 'JADWAL') {
+      const { data: dTemplate } = await supabase
+        .from('jadwal_template')
+        .select('*')
+        .order('hari', { ascending: true });
+      if (dTemplate) setJadwalTemplate(dTemplate);
+
+      const { data: dPengecualian } = await supabase
+        .from('jadwal_kuliah')
+        .select('*')
+        .order('day', { ascending: true });
+      if (dPengecualian) setJadwalPengecualian(dPengecualian);
     }
   };
 
@@ -481,6 +512,67 @@ export default function SuperAdminPage() {
     fetchData();
   };
 
+  // --- HANDLER JADWAL AKADEMIK (BARU) ---
+  const handleTambahTemplate = async () => {
+    if (!adminProfile) return;
+    if (!subjectTemplate.trim() || !timeTemplate.trim()) {
+      return alert("Isi Mata Kuliah & Jam!");
+    }
+    const { error } = await supabase.from('jadwal_template').insert([{
+      kelas_id: adminProfile.kelas_id,
+      hari: parseInt(hariTemplate),
+      subject: subjectTemplate.trim(),
+      time: timeTemplate.trim(),
+      room: roomTemplate.trim(),
+      is_active: true,
+    }]);
+    if (error) return alert("Gagal menambah jadwal: " + error.message);
+    setSubjectTemplate(''); setTimeTemplate(''); setRoomTemplate('');
+    fetchData();
+  };
+
+  const handleHapusTemplate = async (id: number) => {
+    if (!confirm("Hapus matkul ini dari jadwal mingguan?")) return;
+    const { error } = await supabase.from('jadwal_template').delete().eq('id', id);
+    if (error) return alert("Gagal menghapus: " + error.message);
+    fetchData();
+  };
+
+  const handleToggleTemplate = async (id: number, status: boolean) => {
+    const { error } = await supabase.from('jadwal_template').update({ is_active: status }).eq('id', id);
+    if (error) return alert("Gagal mengubah status: " + error.message);
+    fetchData();
+  };
+
+  const handleTambahPengecualian = async () => {
+    if (!adminProfile) return;
+    if (!tglPengecualian) return alert("Pilih tanggal terlebih dahulu!");
+    if (tipePengecualian !== 'libur' && (!subjectPengecualian.trim() || !timePengecualian.trim())) {
+      return alert("Isi Mata Kuliah & Jam (kecuali tipe Libur)!");
+    }
+    const { error } = await supabase.from('jadwal_kuliah').insert([{
+      kelas_id: adminProfile.kelas_id,
+      day: tglPengecualian,
+      subject: tipePengecualian === 'libur' ? null : subjectPengecualian.trim(),
+      time: tipePengecualian === 'libur' ? null : timePengecualian.trim(),
+      room: tipePengecualian === 'libur' ? null : roomPengecualian.trim(),
+      tipe: tipePengecualian,
+      keterangan: keteranganPengecualian.trim() || null,
+      is_published: true,
+    }]);
+    if (error) return alert("Gagal menambah pengecualian: " + error.message);
+    setTglPengecualian(''); setSubjectPengecualian(''); setTimePengecualian(''); setRoomPengecualian('');
+    setKeteranganPengecualian(''); setTipePengecualian('ganti');
+    fetchData();
+  };
+
+  const handleHapusPengecualian = async (id: number) => {
+    if (!confirm("Hapus pengecualian ini?")) return;
+    const { error } = await supabase.from('jadwal_kuliah').delete().eq('id', id);
+    if (error) return alert("Gagal menghapus: " + error.message);
+    fetchData();
+  };
+
   const downloadPDF = async (data: any) => {
     const doc = new jsPDF();
     doc.setFont("times", "bold");
@@ -685,23 +777,29 @@ export default function SuperAdminPage() {
 
   // --- SUDAH LOGIN SEBAGAI ADMIN ---
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 bg-slate-50 min-h-screen font-sans text-slate-800">
-      <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+    <div className="p-4 md:p-10 max-w-7xl mx-auto space-y-8 bg-slate-50 min-h-screen font-sans text-slate-800">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-slate-100">
         <div>
-          <h1 className="text-xl font-black text-indigo-700 uppercase">
-            {view === 'WEB' ? 'Admin Manajemen Konten' : 'Admin Absensi'}
+          <h1 className="text-lg md:text-xl font-black text-indigo-700 uppercase">
+            {view === 'WEB' ? 'Admin Manajemen Konten' : view === 'ABSEN' ? 'Admin Absensi' : 'Admin Jadwal Akademik'}
           </h1>
           <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">
             {adminProfile.nama} • Kelas {adminProfile.kelas_nama}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-slate-100 rounded-xl p-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap bg-slate-100 rounded-xl p-1 gap-1">
             <button
               onClick={() => setView('WEB')}
               className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase ${view === 'WEB' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
             >
               Konten
+            </button>
+            <button
+              onClick={() => setView('JADWAL')}
+              className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase ${view === 'JADWAL' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
+            >
+              Jadwal
             </button>
             <button
               onClick={() => setView('ABSEN')}
@@ -943,7 +1041,7 @@ export default function SuperAdminPage() {
 
           </div>
         </div>
-      ) : (
+      ) : view === 'ABSEN' ? (
         <div className="space-y-6">
           <div className="grid md:grid-cols-2 gap-6">
              <div className="bg-white p-8 rounded-3xl shadow-sm text-center border-l-8 border-blue-600">
@@ -982,6 +1080,144 @@ export default function SuperAdminPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-8">
+
+          {/* JADWAL MINGGUAN (POLA TETAP) */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-indigo-600">
+            <h2 className="font-black mb-1 text-indigo-700 uppercase text-xs">📅 Jadwal Mingguan (Pola Tetap)</h2>
+            <p className="text-[10px] text-slate-400 font-medium mb-4">
+              Isi sekali, otomatis berlaku setiap minggu terus-menerus. Cukup ubah kalau memang ada perubahan permanen di jadwal kelas.
+            </p>
+
+            <div className="grid md:grid-cols-5 gap-3 items-end mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <div>
+                <p className="text-[9px] font-black uppercase mb-1 text-slate-400">Hari</p>
+                <select
+                  className="w-full border p-3 rounded-xl text-xs font-bold text-black"
+                  value={hariTemplate}
+                  onChange={e => setHariTemplate(e.target.value)}
+                >
+                  {namaHari.map((h, i) => <option key={i} value={i}>{h}</option>)}
+                </select>
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase mb-1 text-slate-400">Mata Kuliah</p>
+                <input type="text" placeholder="Nama Matkul" className="w-full border p-3 rounded-xl text-xs text-black" value={subjectTemplate} onChange={e => setSubjectTemplate(e.target.value)} />
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase mb-1 text-slate-400">Jam</p>
+                <input type="text" placeholder="08.00 - 10.00" className="w-full border p-3 rounded-xl text-xs text-black" value={timeTemplate} onChange={e => setTimeTemplate(e.target.value)} />
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase mb-1 text-slate-400">Ruangan</p>
+                <input type="text" placeholder="Ruang / Lab" className="w-full border p-3 rounded-xl text-xs text-black" value={roomTemplate} onChange={e => setRoomTemplate(e.target.value)} />
+              </div>
+              <button onClick={handleTambahTemplate} className="bg-indigo-600 text-white py-3 rounded-xl font-black text-xs shadow-md">TAMBAH</button>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              {namaHari.map((namaH, idxHari) => {
+                const listPerHari = jadwalTemplate.filter(t => t.hari === idxHari);
+                return (
+                  <div key={idxHari} className="bg-slate-50 rounded-2xl border border-slate-100 p-4">
+                    <p className="text-[10px] font-black uppercase text-indigo-700 mb-2">{namaH}</p>
+                    {listPerHari.length === 0 ? (
+                      <p className="text-[10px] text-slate-400 italic">Tidak ada jadwal</p>
+                    ) : listPerHari.map(t => (
+                      <div key={t.id} className="flex justify-between items-center bg-white p-2.5 mb-2 rounded-xl border border-slate-100">
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-800 uppercase">{t.subject}</p>
+                          <p className="text-[9px] text-slate-400 font-medium">{t.time} • {t.room || '-'}</p>
+                        </div>
+                        <div className="flex gap-2 items-center">
+                          <button
+                            onClick={() => handleToggleTemplate(t.id, !t.is_active)}
+                            className={`px-2 py-1 rounded-lg text-[8px] font-black ${t.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}
+                          >
+                            {t.is_active ? 'AKTIF' : 'OFF'}
+                          </button>
+                          <button onClick={() => handleHapusTemplate(t.id)} className="text-red-500 text-[9px] font-black hover:underline">HAPUS</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* PENGECUALIAN / PERUBAHAN MENDADAK */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border-t-8 border-amber-500">
+            <h2 className="font-black mb-1 text-amber-600 uppercase text-xs">⚡ Pengecualian / Perubahan Mendadak</h2>
+            <p className="text-[10px] text-slate-400 font-medium mb-4">
+              Cuma buat kasus dadakan di 1 tanggal spesifik — dosen ganti jadwal, libur, dll. Jadwal mingguan di atas gak kesentuh sama sekali.
+            </p>
+
+            <div className="grid md:grid-cols-6 gap-3 items-end mb-6 p-4 bg-amber-50 rounded-2xl border border-amber-100">
+              <div>
+                <p className="text-[9px] font-black uppercase mb-1 text-slate-400">Tanggal</p>
+                <input type="date" className="w-full border p-3 rounded-xl text-xs text-black" value={tglPengecualian} onChange={e => setTglPengecualian(e.target.value)} />
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase mb-1 text-slate-400">Tipe</p>
+                <select className="w-full border p-3 rounded-xl text-xs font-bold text-black" value={tipePengecualian} onChange={e => setTipePengecualian(e.target.value)}>
+                  <option value="ganti">Ganti Jadwal</option>
+                  <option value="tambahan">Tambahan</option>
+                  <option value="libur">Libur</option>
+                </select>
+              </div>
+
+              {tipePengecualian !== 'libur' && (
+                <>
+                  <div>
+                    <p className="text-[9px] font-black uppercase mb-1 text-slate-400">Mata Kuliah</p>
+                    <input type="text" placeholder="Nama Matkul" className="w-full border p-3 rounded-xl text-xs text-black" value={subjectPengecualian} onChange={e => setSubjectPengecualian(e.target.value)} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase mb-1 text-slate-400">Jam</p>
+                    <input type="text" placeholder="14.00 - 16.00" className="w-full border p-3 rounded-xl text-xs text-black" value={timePengecualian} onChange={e => setTimePengecualian(e.target.value)} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase mb-1 text-slate-400">Ruangan</p>
+                    <input type="text" placeholder="Ruang / Lab" className="w-full border p-3 rounded-xl text-xs text-black" value={roomPengecualian} onChange={e => setRoomPengecualian(e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              <div className={tipePengecualian === 'libur' ? 'md:col-span-3' : ''}>
+                <p className="text-[9px] font-black uppercase mb-1 text-slate-400">Keterangan (opsional)</p>
+                <input type="text" placeholder="Alasan perubahan..." className="w-full border p-3 rounded-xl text-xs text-black" value={keteranganPengecualian} onChange={e => setKeteranganPengecualian(e.target.value)} />
+              </div>
+
+              <button onClick={handleTambahPengecualian} className="bg-amber-500 text-white py-3 rounded-xl font-black text-xs shadow-md">TAMBAH</button>
+            </div>
+
+            <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
+              {jadwalPengecualian.length === 0 ? (
+                <p className="text-[10px] text-slate-400 italic">Belum ada pengecualian.</p>
+              ) : jadwalPengecualian.map(p => (
+                <div key={p.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] font-black text-slate-700">{p.day}</span>
+                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        p.tipe === 'libur' ? 'bg-red-100 text-red-600' :
+                        p.tipe === 'tambahan' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-700'
+                      }`}>{p.tipe}</span>
+                    </div>
+                    {p.tipe === 'libur' ? (
+                      <p className="text-[10px] text-slate-500 italic">{p.keterangan || 'Tidak ada perkuliahan'}</p>
+                    ) : (
+                      <p className="text-[10px] font-bold text-slate-800 uppercase">{p.subject} — {p.time} • {p.room || '-'}</p>
+                    )}
+                  </div>
+                  <button onClick={() => handleHapusPengecualian(p.id)} className="text-red-500 text-[9px] font-black hover:underline shrink-0">HAPUS</button>
+                </div>
+              ))}
             </div>
           </div>
         </div>

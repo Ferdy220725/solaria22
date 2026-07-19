@@ -11,6 +11,7 @@ interface SesiPresentasi {
   id: string;
   kode: string;
   nama_sesi: string;
+  kelas_id: string;
 }
 
 interface PresentasiItem {
@@ -51,6 +52,7 @@ export default function LobbySesi({
 
   useEffect(() => {
     fetchSesi();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kode]);
 
   const fetchSesi = async () => {
@@ -102,6 +104,7 @@ export default function LobbySesi({
         .from("presentasi_items")
         .insert({
           sesi_id: sesi.id,
+          kelas_id: sesi.kelas_id, // wajib, kolom NOT NULL + terikat RLS ke kelas sesi ini
           nama_kelompok: namaKelompok.trim(),
           file_url: publicUrlData.publicUrl,
           thumbnail_url: thumbnail,
@@ -113,7 +116,8 @@ export default function LobbySesi({
       setFile(null);
       fetchSesi();
     } catch (err: any) {
-      alert("Gagal upload: " + err.message);
+      console.error("Upload error:", err);
+      alert("Gagal upload: " + (err?.message ?? "Terjadi kesalahan tidak diketahui."));
     } finally {
       setUploading(false);
     }

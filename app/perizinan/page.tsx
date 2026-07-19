@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import SignatureCanvas from "react-signature-canvas";
 import { jsPDF } from "jspdf";
 import { createClient } from "@/utils/supabase/client"; // Pastikan path ini sesuai dengan project Next.js kamu
@@ -51,6 +51,46 @@ const SuratIzinMahasiswa = () => {
   const clearSignature = (type: "mhs" | "ortu") => {
     if (type === "mhs") sigPadMhs.current?.clear();
     else sigPadOrtu.current?.clear();
+  };
+
+  // ── FIX #1: Simpan & pulihkan tanda tangan setiap kali ukuran viewport
+  // berubah (termasuk saat keyboard HP muncul/hilang), supaya coretan yang
+  // sudah digambar tidak hilang. Canvas HTML otomatis "kosong" setiap kali
+  // width/height-nya berubah — resize akibat keyboard memicu ini.
+  // Kita simpan sebagai data stroke (toData/fromData), bukan gambar bitmap,
+  // supaya tidak gepeng/blur ketika proporsi kanvas ikut berubah.
+  useEffect(() => {
+    const preserveSignatures = () => {
+      [sigPadMhs, sigPadOrtu].forEach((ref) => {
+        const pad = ref.current;
+        if (!pad || pad.isEmpty()) return;
+        const data = pad.toData();
+        // beri jeda 1 frame supaya canvas selesai resize dulu sebelum digambar ulang
+        requestAnimationFrame(() => {
+          pad.clear();
+          pad.fromData(data);
+        });
+      });
+    };
+
+    // visualViewport lebih akurat untuk mendeteksi perubahan akibat keyboard mobile
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", preserveSignatures);
+    window.addEventListener("resize", preserveSignatures);
+
+    return () => {
+      vv?.removeEventListener("resize", preserveSignatures);
+      window.removeEventListener("resize", preserveSignatures);
+    };
+  }, []);
+
+  // ── FIX #2: Tutup keyboard otomatis begitu user mulai menyentuh area
+  // tanda tangan, supaya keyboard tidak menutupi kanvas saat mulai menggambar.
+  const blurActiveInput = () => {
+    const el = document.activeElement as HTMLElement | null;
+    if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
+      el.blur();
+    }
   };
 
   // ── Generate PDF surat izin (dipakai langsung dari data form + TTD yang baru diisi) ──
@@ -418,7 +458,11 @@ const SuratIzinMahasiswa = () => {
                   [hapus]
                 </button>
               </label>
-              <div className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-white/5 overflow-hidden touch-none">
+              <div
+                className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-white/5 overflow-hidden touch-none"
+                onTouchStart={blurActiveInput}
+                onPointerDown={blurActiveInput}
+              >
                 <SignatureCanvas ref={sigPadOrtu} penColor="black" canvasProps={{ className: "w-full h-32" }} />
               </div>
             </div>
@@ -429,7 +473,11 @@ const SuratIzinMahasiswa = () => {
                   [hapus]
                 </button>
               </label>
-              <div className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-white/5 overflow-hidden touch-none">
+              <div
+                className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-white/5 overflow-hidden touch-none"
+                onTouchStart={blurActiveInput}
+                onPointerDown={blurActiveInput}
+              >
                 <SignatureCanvas ref={sigPadMhs} penColor="black" canvasProps={{ className: "w-full h-32" }} />
               </div>
             </div>

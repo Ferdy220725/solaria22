@@ -1,5 +1,11 @@
 self.addEventListener('push', function (event) {
-  const data = event.data.json();
+  let data = { title: 'Zora', body: 'Ada pemberitahuan baru.' };
+  try {
+    data = event.data.json();
+  } catch (err) {
+    const text = event.data ? event.data.text() : null;
+    if (text) data = { title: 'Zora', body: text };
+  }
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
@@ -9,7 +15,6 @@ self.addEventListener('push', function (event) {
     })
   );
 });
-
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
   event.waitUntil(

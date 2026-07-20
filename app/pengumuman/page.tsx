@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Megaphone, Pin, Loader2, PackageOpen, Link2 } from 'lucide-react';
+import { Megaphone, Pin, Loader2, PackageOpen, Link2, CheckCircle2, RotateCcw } from 'lucide-react';
 
 interface Pengumuman {
   id: string;
@@ -13,14 +13,51 @@ interface Pengumuman {
   created_at: string;
 }
 
+const STORAGE_KEY = 'pengumuman_read_ids';
+
 export default function PengumumanPage() {
   const [items, setItems] = useState<Pengumuman[]>([]);
   const [loading, setLoading] = useState(true);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const supabase = createClient();
 
   useEffect(() => {
     fetchPengumuman();
+    loadReadIds();
   }, []);
+
+  const loadReadIds = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const arr: string[] = JSON.parse(raw);
+        setReadIds(new Set(arr));
+      }
+    } catch (e) {
+      console.error('Gagal membaca status baca dari localStorage', e);
+    }
+  };
+
+  const persistReadIds = (next: Set<string>) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(next)));
+    } catch (e) {
+      console.error('Gagal menyimpan status baca ke localStorage', e);
+    }
+  };
+
+  const toggleRead = (id: string) => {
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      persistReadIds(next);
+      return next;
+    });
+  };
 
   const fetchPengumuman = async () => {
     const { data } = await supabase
@@ -66,38 +103,72 @@ export default function PengumumanPage() {
         {/* LIST */}
         {items.length > 0 ? (
           <div className="space-y-4">
-            {items.map((p) => (
-              <div
-                key={p.id}
-                className={`bg-white dark:bg-[#141414] rounded-[24px] p-6 shadow-sm border ${
-                  p.is_pinned ? 'border-indigo-200 dark:border-indigo-500/30' : 'border-slate-100 dark:border-white/10'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <h2 className="font-black text-slate-900 dark:text-white text-base flex items-center gap-2 flex-wrap">
-                    {p.is_pinned && (
-                      <span className="text-indigo-600 flex items-center gap-1 text-[10px] font-black uppercase bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded-lg shrink-0">
-                        <Pin size={11} /> Disematkan
-                      </span>
-                    )}
-                    {p.judul}
-                  </h2>
-                </div>
-                <p className="text-xs text-slate-400 font-medium mb-3">{formatTanggal(p.created_at)}</p>
-                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">{p.isi}</p>
+            {items.map((p) => {
+              const isRead = readIds.has(p.id);
 
-                {p.link && (
-                  
-                   <a href={p.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-4 inline-flex items-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all"
+              // CARD YANG SUDAH DIBACA -> tampil dipersempit
+              if (isRead) {
+                return (
+                  <div
+                    key={p.id}
+                    className="bg-white dark:bg-[#141414] rounded-2xl px-4 py-3 shadow-sm border border-slate-100 dark:border-white/10 flex items-center justify-between gap-3"
                   >
-                    <Link2 size={14} /> Buka Link Terkait
-                  </a>
-                )}
-              </div>
-            ))}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                      <span className="text-sm font-bold text-slate-400 dark:text-slate-500 truncate line-through decoration-slate-300">
+                        {p.judul}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => toggleRead(p.id)}
+                      className="shrink-0 flex items-center gap-1.5 text-[11px] font-black uppercase text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all"
+                    >
+                      <RotateCcw size={12} /> Baca Lagi
+                    </button>
+                  </div>
+                );
+              }
+
+              // CARD NORMAL (BELUM DIBACA)
+              return (
+                <div
+                  key={p.id}
+                  className={`bg-white dark:bg-[#141414] rounded-[24px] p-6 shadow-sm border ${
+                    p.is_pinned ? 'border-indigo-200 dark:border-indigo-500/30' : 'border-slate-100 dark:border-white/10'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <h2 className="font-black text-slate-900 dark:text-white text-base flex items-center gap-2 flex-wrap">
+                      {p.is_pinned && (
+                        <span className="text-indigo-600 flex items-center gap-1 text-[10px] font-black uppercase bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded-lg shrink-0">
+                          <Pin size={11} /> Disematkan
+                        </span>
+                      )}
+                      {p.judul}
+                    </h2>
+
+                    <button
+                      onClick={() => toggleRead(p.id)}
+                      className="shrink-0 flex items-center gap-1.5 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/5 px-3 py-1.5 rounded-lg hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 transition-all"
+                    >
+                      <CheckCircle2 size={13} /> Sudah Baca
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-400 font-medium mb-3">{formatTanggal(p.created_at)}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">{p.isi}</p>
+
+                  {p.link && (
+                    <a href={p.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-4 inline-flex items-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all"
+                    >
+                      <Link2 size={14} /> Buka Link Terkait
+                    </a>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="bg-white dark:bg-[#141414] rounded-[28px] py-20 text-center shadow-sm border border-slate-100 dark:border-white/10">

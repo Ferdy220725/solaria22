@@ -39,7 +39,7 @@ export default function LandingPage() {
           />
 
           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 px-4 py-1.5 rounded-full mb-4">
-            Kelas C Agroteknologi
+            Class Management System
           </span>
 
           <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900 dark:text-white mb-4 leading-tight">

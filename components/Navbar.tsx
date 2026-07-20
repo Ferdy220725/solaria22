@@ -19,6 +19,8 @@ import {
   Settings,
   HelpCircle,
   GraduationCap,
+  Landmark,
+  School,
   Menu,
   X,
   Bell,
@@ -56,6 +58,13 @@ const mainNavItems: NavItem[] = [
     icon: <GraduationCap size={20} />,
     external: true,
   },
+  {
+    id: "skpm",
+    name: "SKPM Online",
+    href: "https://skpm.upnjatim.ac.id/dashboard",
+    icon: <Landmark size={20} />,
+    external: true,
+  },
 ];
 
 const footerNavItems: NavItem[] = [
@@ -65,7 +74,7 @@ const footerNavItems: NavItem[] = [
     id: "eksternal",
     name: "SIAMIK",
     href: "https://siamik.upnjatim.ac.id/html/siamik/index.asp",
-    icon: <GraduationCap size={20} />,
+    icon: <School size={20} />,
     external: true,
   },
 ];

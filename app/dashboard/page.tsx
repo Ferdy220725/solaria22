@@ -71,7 +71,7 @@ export default function Dashboard() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [tugas, setTugas] = useState<Tugas[]>([]);
   const [tugasPraktikum, setTugasPraktikum] = useState<TugasPraktikum[]>([]);
-  const [displayName, setDisplayName] = useState('Sobat Agrotek');
+  const [displayName, setDisplayName] = useState('Teman ZORA😉');
   const [completedTaskIds, setCompletedTaskIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'perlu dikerjakan' | 'sudah selesai'>('perlu dikerjakan');
   const [zoomMeetings, setZoomMeetings] = useState<any[]>([]);
@@ -188,7 +188,7 @@ export default function Dashboard() {
       .limit(5);
     if (pData) setPengumuman(pData as Pengumuman[]);
 
-    const savedName = localStorage.getItem('nama_user_solaria') || 'Sobat Agrotek';
+    const savedName = localStorage.getItem('nama_user_solaria') || 'Teman ZORA😉';
     setDisplayName(savedName.trim().split(' ')[0]);
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -224,10 +224,10 @@ export default function Dashboard() {
 
         setRiwayatBukti(buktiMap);
         setCompletedTaskIds(completedIdsFromDB);
-        localStorage.setItem('agrotek_completed_tasks', JSON.stringify(completedIdsFromDB));
+        localStorage.setItem('ZORA_completed_tasks', JSON.stringify(completedIdsFromDB));
       }
     } else {
-      const currentCompletedTasks = JSON.parse(localStorage.getItem('agrotek_completed_tasks') || '[]');
+      const currentCompletedTasks = JSON.parse(localStorage.getItem('ZORA_completed_tasks') || '[]');
       setCompletedTaskIds(currentCompletedTasks);
       setJadwalHariIni([]);
     }

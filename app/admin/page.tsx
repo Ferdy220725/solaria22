@@ -421,29 +421,26 @@ export default function SuperAdminPage() {
     if (!judulMateri.trim()) return alert("Judul materi tidak boleh kosong!");
     if (!mkMateri.trim()) return alert("Nama Mata Kuliah tidak boleh kosong!");
     if (!semesterMateri) return alert("Semester harus diisi!");
-    if (file.type !== 'application/pdf') return alert("File materi harus berformat PDF!");
 
     try {
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
+      const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const { error: storageError } = await supabase.storage
+        .from('uploads')
+        .upload(fileName, file);
 
-      const uploadRes = await fetch('/api/upload-drive', {
-        method: 'POST',
-        body: uploadFormData,
-      });
-
-      const uploadResult = await uploadRes.json();
-
-      if (!uploadRes.ok || !uploadResult.fileId) {
-        console.error("Drive Upload Error:", uploadResult.error);
-        return alert("Gagal Upload File ke Drive: " + (uploadResult.error || "Unknown error"));
+      if (storageError) {
+        console.error("Storage Error:", storageError);
+        return alert("Gagal Upload File ke Storage: " + storageError.message);
       }
 
-      const fileId = uploadResult.fileId;
+      const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(fileName);
+      if (!urlData?.publicUrl) {
+        return alert("Gagal mendapatkan URL file dari storage.");
+      }
 
       const { error: dbError } = await supabase.from('materi').insert([{
         judul: judulMateri.trim(),
-        file_url: fileId,
+        file_url: urlData.publicUrl,
         mk_nama: mkMateri.trim(),
         semester: parseInt(semesterMateri),
         kelas_id: adminProfile.kelas_id,
@@ -451,7 +448,7 @@ export default function SuperAdminPage() {
 
       if (dbError) {
         console.error("Database Error:", dbError);
-        return alert("File terupload ke Drive, tapi GAGAL simpan ke Database: " + dbError.message);
+        return alert("File terupload, tapi GAGAL simpan ke Database: " + dbError.message + " (kolom kelas_id mungkin belum ada di tabel materi — cek lagi skemanya)");
       }
 
       alert("Materi Berhasil Diunggah dan Disimpan!");
@@ -460,7 +457,8 @@ export default function SuperAdminPage() {
         `📄 <b>MATERI BARU DIUNGGAH</b>\n` +
         `Matkul: <b>${mkMateri.trim()}</b>\n` +
         `Judul: ${judulMateri.trim()}\n` +
-        `Semester: ${semesterMateri}`
+        `Semester: ${semesterMateri}\n` +
+        `Link: ${urlData.publicUrl}`
       );
 
       setJudulMateri('');
